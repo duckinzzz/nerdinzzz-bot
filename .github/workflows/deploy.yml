@@ -20,5 +20,7 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
             cd /srv/bots/nerdinzzz-bot
-            docker compose pull
+            git fetch origin
+            git reset --hard origin/main
+            docker compose build
             docker compose up -d --remove-orphans
