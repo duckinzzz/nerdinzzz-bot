@@ -1,0 +1,9 @@
+services:
+  bot:
+    build: .
+    container_name: nerdinzzz-bot
+    restart: unless-stopped
+    environment:
+      DOCKER: "1"
+    env_file:
+      - .env
