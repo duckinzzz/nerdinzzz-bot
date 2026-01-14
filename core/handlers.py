@@ -26,7 +26,7 @@ async def cmd_start(message: types.Message):
 
     welcome_text = (
         f"Nerdinzzz 🤓 – LLM чат-бот на базе {llm_utils.llm_model_name}."
-        f"Просто спросите!"
+        f"\nПросто спросите!"
     )
 
     await message.answer(welcome_text)
