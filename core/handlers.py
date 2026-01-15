@@ -48,7 +48,7 @@ async def text_handler(message: types.Message):
     }
     logger.info(json.dumps(log_data, ensure_ascii=False))
 
-    await message.answer(clean_response, parse_mode="MarkdownV2")
+    await message.answer(clean_response, parse_mode="markdown")
 
 
 @start_router.message(~F.content_type.in_(SUPPORTED_TYPES))
