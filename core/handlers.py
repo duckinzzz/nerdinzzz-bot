@@ -4,7 +4,6 @@ from aiogram import Router, types, F
 from aiogram.filters import CommandStart
 
 from core.bot_core import logger
-from helpers import formatting
 from utils import llm_utils
 from utils.llm_utils import get_llm_response
 
