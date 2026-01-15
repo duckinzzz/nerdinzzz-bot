@@ -37,17 +37,15 @@ async def text_handler(message: types.Message):
     user_name = get_user_name(message.from_user)
     text = message.text
     llm_response = await get_llm_response(text)
-    clean_response = formatting.escape_md(llm_response)
     log_data = {
         "userID": message.from_user.id,
         "username": user_name,
         "text": text,
         "response": llm_response,
-        "clean_response": clean_response
     }
     logger.info(json.dumps(log_data, ensure_ascii=False))
 
-    await message.answer(clean_response, parse_mode="markdown")
+    await message.answer(llm_response, parse_mode="markdown")
 
 
 @start_router.message(~F.content_type.in_(SUPPORTED_TYPES))
