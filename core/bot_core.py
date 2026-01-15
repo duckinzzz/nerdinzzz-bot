@@ -1,25 +1,20 @@
-import logging
 import os
-import sys
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from dotenv import load_dotenv
 
+from utils.logging_utils import logger
+
 if not os.getenv("DOCKER"):
     load_dotenv()
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(name)s | %(levelname)s | %(message)s",
-    handlers=[logging.FileHandler("./bot.log"), logging.StreamHandler(sys.stdout)]
-)
-logger = logging.getLogger("bot_core")
 
 ENV = os.getenv("ENV").lower()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 LLM_TOKEN = os.getenv("LLM_TOKEN")
+STT_TOKEN = os.getenv("STT_TOKEN")
+BOT_USERNAME = os.getenv("BOT_USERNAME")
 
 if not BOT_TOKEN:
     raise ValueError(f"BOT_TOKEN not found")
