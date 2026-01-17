@@ -23,7 +23,7 @@ async def get_llm_response(user_prompt: str) -> str:
     ]
 
     completion = await client.chat.completions.create(model=dp['llm'], messages=messages, temperature=1,
-                                                      max_completion_tokens=1024, top_p=1,
+                                                      max_completion_tokens=1024, top_p=1, reasoning_format='hidden',
                                                       stream=False, stop=None)
 
     return completion.choices[0].message.content
