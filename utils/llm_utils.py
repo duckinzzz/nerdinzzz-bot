@@ -21,9 +21,20 @@ async def get_llm_response(user_prompt: str) -> str:
         },
         {"role": "user", "content": user_prompt}
     ]
+    kwargs = {
+        "model": dp["llm"],
+        "messages": messages,
+        "temperature": 1,
+        "max_completion_tokens": 1024,
+        "top_p": 1,
+        "stream": False,
+        "stop": None,
+    }
 
-    completion = await client.chat.completions.create(model=dp['llm'], messages=messages, temperature=1,
-                                                      max_completion_tokens=1024, top_p=1, reasoning_format='hidden',
-                                                      stream=False, stop=None)
+    # reasoning not supported
+    if dp["llm"] != "moonshotai/kimi-k2-instruct-0905":
+        kwargs["reasoning_format"] = "hidden"
+
+    completion = await client.chat.completions.create(**kwargs)
 
     return completion.choices[0].message.content
