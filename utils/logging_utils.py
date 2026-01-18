@@ -7,8 +7,8 @@ from aiogram import types
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s | %(name)s | %(levelname)s | %(message)s",
-    handlers=[logging.FileHandler("./bot.log"), logging.StreamHandler(sys.stdout)]
+    format="%(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
 )
 logger = logging.getLogger("bot_core")
 
@@ -21,6 +21,8 @@ def log_message(message: types.Message, **kwargs):
     chat = message.chat
 
     data = {
+        "service": "bot",
+        "level": "info",
         "handler": caller_name,
         "userID": user.id,
         "username": username,
