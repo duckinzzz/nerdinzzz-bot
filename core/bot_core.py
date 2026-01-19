@@ -14,12 +14,15 @@ BOT_USERNAME = os.getenv("BOT_USERNAME")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 
 if not BOT_TOKEN:
-    raise ValueError(f"BOT_TOKEN not found")
+    raise ValueError("BOT_TOKEN not found")
 if not LLM_TOKEN:
-    raise ValueError(f"LLM_TOKEN Token not found")
+    raise ValueError("LLM_TOKEN Token not found")
 
 logger.info(f"Bot starting in {ENV} mode | token ends with ...{BOT_TOKEN[-6:]}")
 
-bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+bot = Bot(
+    token=BOT_TOKEN,
+    default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+)
 dp = Dispatcher()
 dp['llm'] = "openai/gpt-oss-120b"

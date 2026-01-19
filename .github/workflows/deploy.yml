@@ -30,6 +30,10 @@ jobs:
             GRAFANA_ADMIN_PW=${{ secrets.GRAFANA_ADMIN_PW }}
             LLM_TOKEN=${{ secrets.LLM_TOKEN }}
             STT_TOKEN=${{ secrets.STT_TOKEN }}
+            WEBHOOK_URL=${{ secrets.WEBHOOK_URL }}
+            WEBHOOK_PATH=${{ secrets.WEBHOOK_PATH }}
+            WEBHOOK_HOST=${{ secrets.WEBHOOK_HOST }}
+            WEBHOOK_PORT=${{ secrets.WEBHOOK_PORT }}
             EOF
 
             git fetch origin
