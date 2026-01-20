@@ -1,26 +1,18 @@
-import os
-
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 from aiohttp import web
-
-from core.bot_core import bot, dp, logger
-from core.handlers import start_router
-
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")
-WEBHOOK_PATH = os.getenv("WEBHOOK_PATH", "/webhook")
-WEBHOOK_HOST = os.getenv("WEBHOOK_HOST", "0.0.0.0")
-WEBHOOK_PORT = int(os.getenv("WEBHOOK_PORT", 8080))
-ENV = os.getenv("ENV", "dev")
-
 from aiohttp.web_app import Application
+
+from core.app import bot, dp
+from core.config import WEBHOOK_HOST, WEBHOOK_PORT, WEBHOOK_PATH, ENV, WEBHOOK_URL
+from core.handlers import start_router
+from utils import db_utils
+from utils.logging_utils import logger
 
 
 async def on_startup(_: Application) -> None:
+    await db_utils.init_db()
     dp.include_router(start_router)
-    await bot.set_webhook(
-        url=WEBHOOK_URL,
-        drop_pending_updates=True
-    )
+    await bot.set_webhook(url=WEBHOOK_URL, drop_pending_updates=True)
     logger.info(f"[{ENV}] Webhook set to {WEBHOOK_URL}")
 
 

@@ -1,13 +1,14 @@
 from groq import AsyncGroq
 
-from core.bot_core import LLM_TOKEN, dp
+from core.config import LLM_TOKEN
+from core.constants import LLM_WITH_REASONING
 
 client = AsyncGroq(api_key=LLM_TOKEN)
 
 
-async def get_llm_response(user_prompt: str) -> str:
+async def get_llm_response(user_prompt: str, llm: str) -> str:
     system_prompt = (
-        f"Ты — Nerdinzzz 🤓, LLM чат-бот на базе {dp['llm']}. "
+        f"Ты — Nerdinzzz 🤓, LLM чат-бот на базе {llm}. "
         "Твой создатель - @duckinzzz. "
         "Ты умеешь быстро отвечать на текстовые сообщения и преобразовывать голосовые в текст. "
         "Отвечай кратко, ясно и по делу, максимум 3-4 предложения. "
@@ -22,7 +23,7 @@ async def get_llm_response(user_prompt: str) -> str:
         {"role": "user", "content": user_prompt}
     ]
     kwargs = {
-        "model": dp["llm"],
+        "model": llm,
         "messages": messages,
         "temperature": 1,
         "max_completion_tokens": 1024,
@@ -31,8 +32,7 @@ async def get_llm_response(user_prompt: str) -> str:
         "stop": None,
     }
 
-    # reasoning not supported
-    if dp["llm"] != "moonshotai/kimi-k2-instruct-0905":
+    if llm in LLM_WITH_REASONING:
         kwargs["reasoning_format"] = "hidden"
 
     completion = await client.chat.completions.create(**kwargs)

@@ -4,7 +4,7 @@ import ffmpeg
 import imageio_ffmpeg as iio
 from groq import Groq
 
-from core.bot_core import STT_TOKEN
+from core.config import STT_TOKEN
 
 client = Groq(api_key=STT_TOKEN)
 
