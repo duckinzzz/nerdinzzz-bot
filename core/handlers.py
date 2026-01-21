@@ -1,6 +1,9 @@
+import asyncio
 import tempfile
+from collections import defaultdict
 
-from aiogram import Router, types, F
+from aiogram import F, types
+from aiogram import Router
 from aiogram.filters import CommandStart, Command
 
 from core.app import bot
@@ -33,10 +36,6 @@ async def cmd_start(message: types.Message):
     logger.info(f"User {username} ({uid}) started the bot")
 
 
-import asyncio
-from collections import defaultdict
-from aiogram import types
-
 # Буфер для альбомов
 album_buffer: dict[str, list[types.Message]] = defaultdict(list)
 
@@ -65,49 +64,84 @@ def check_image_limits(message: types.Message) -> list[str]:
 
 @start_router.message(F.content_type == types.ContentType.PHOTO)
 async def handle_photo(message: types.Message):
-    chat_id = message.chat.id
+    chat = message.chat
+    chat_id = chat.id
+    is_group = chat.type in ("group", "supergroup")
 
-    # Проверяем LLM-модель чата
+    media_id = message.media_group_id
+
+    # ---------- GROUP / SUPERGROUP ----------
+    if is_group:
+        # одиночное фото
+        if not media_id:
+            if not (message.caption and message.caption.startswith(f"@{BOT_USERNAME}")):
+                return
+
+        # альбом
+        else:
+            # если это первое сообщение альбома — принимаем решение
+            if media_id not in album_buffer:
+                if not (message.caption and message.caption.startswith(f"@{BOT_USERNAME}")):
+                    # помечаем альбом как запрещённый
+                    album_buffer[media_id] = None
+                    return
+
+                album_buffer[media_id] = []
+
+            # если альбом ранее помечен как запрещённый
+            if album_buffer.get(media_id) is None:
+                return
+
+    # ---------- PRIVATE ----------
+    # в личке всегда разрешено
+
+    # ---------- проверяем модель ----------
     llm_code = await get_chat_llm(chat_id)
     is_multimodal = LLM_MODELS.get(llm_code, {}).get("multimodal", False)
     if not is_multimodal:
         await message.answer(
             "❌ Текущая модель не обрабатывает изображения, выберите другую:\n"
             "`/set_llm meta-llama/llama-4-maverick-17b-128e-instruct`\n"
-            "`/set_llm meta-llama/llama-4-scout-17b-16e-instruct`"
+            "`/set_llm meta-llama/llama-4-scout-17b-16e-instruct`",
+            parse_mode="Markdown"
         )
         return
 
-    # одиночное фото
-    if not message.media_group_id:
+    # ---------- одиночное фото ----------
+    if not media_id:
         errors = check_image_limits(message)
         if errors:
             await message.answer(
-                f"❌ Изображение превышает лимиты:\n- " + "\n- ".join(errors)
+                "❌ Изображение превышает лимиты:\n- " + "\n- ".join(errors)
             )
             return
 
         caption = message.caption or "— подписи нет —"
-        response = await get_ocr_response(caption, [message.photo[-1]], llm_code)
+        response = await get_ocr_response(
+            caption,
+            [message.photo[-1]],
+            llm_code
+        )
         await message.answer(str(response))
         return
 
-    # альбом
-    media_id = message.media_group_id
+    # ---------- альбом ----------
     album_buffer[media_id].append(message)
 
     await asyncio.sleep(0.5)
 
-    if media_id not in album_buffer:
+    messages = album_buffer.pop(media_id, None)
+    if not messages:
         return
 
-    messages = album_buffer.pop(media_id)
-
+    # лимит фото
     if len(messages) > MAX_IMAGES_PER_REQUEST:
-        await message.answer(f"❌ Пришлите не больше {MAX_IMAGES_PER_REQUEST} изображений")
+        await message.answer(
+            f"❌ Пришлите не больше {MAX_IMAGES_PER_REQUEST} изображений"
+        )
         return
 
-    # Проверяем лимиты для каждого изображения
+    # лимиты по каждому изображению
     for idx, msg in enumerate(messages, 1):
         errors = check_image_limits(msg)
         if errors:
@@ -118,8 +152,9 @@ async def handle_photo(message: types.Message):
 
     caption = messages[0].caption or "— подписи нет —"
     photos = [msg.photo[-1] for msg in messages]
+
     response = await get_ocr_response(caption, photos, llm_code)
-    await message.answer(str(response))
+    await message.answer(response)
 
 
 @start_router.message(F.content_type == "voice")
