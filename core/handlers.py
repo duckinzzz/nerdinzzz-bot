@@ -116,7 +116,7 @@ async def handle_photo(message: types.Message):
             )
             return
 
-        caption = message.caption or "— подписи нет —"
+        caption = message.caption.replace(f"@{BOT_USERNAME}", '') or ""
         response = await get_ocr_response(
             caption,
             [message.photo[-1]],
@@ -150,7 +150,7 @@ async def handle_photo(message: types.Message):
             )
             return
 
-    caption = messages[0].caption or "— подписи нет —"
+    caption = messages[0].caption.replace(f"@{BOT_USERNAME}", '').strip() or ""
     photos = [msg.photo[-1] for msg in messages]
 
     response = await get_ocr_response(caption, photos, llm_code)
@@ -203,7 +203,7 @@ async def set_llm_handler(message: types.Message):
 
     if message.chat.type in ("group", "supergroup"):
         member = await bot.get_chat_member(chat_id=chat_id, user_id=message.from_user.id)
-        if message.from_user.id != ADMIN_ID or member.status not in ("administrator", "creator"):
+        if message.from_user.id != ADMIN_ID and member.status not in ("administrator", "creator"):
             await message.answer("❌ Только админ может менять модель в группе")
             return
 
