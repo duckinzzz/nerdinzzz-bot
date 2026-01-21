@@ -1,29 +1,74 @@
+import base64
+import tempfile
+
+from aiogram import types
 from groq import AsyncGroq
 
+from core.app import bot
 from core.config import LLM_TOKEN
-from core.constants import LLM_WITH_REASONING
+from core.constants import LLM_MODELS
 
 client = AsyncGroq(api_key=LLM_TOKEN)
 
 
-async def get_llm_response(user_prompt: str, llm: str) -> str:
-    system_prompt = (
-        f"Ты — Nerdinzzz 🤓, LLM чат-бот на базе {llm}. "
-        "Твой создатель - @duckinzzz. "
-        "Ты умеешь быстро отвечать на текстовые сообщения и преобразовывать голосовые в текст. "
-        "Отвечай кратко, ясно и по делу, максимум 3-4 предложения. "
-        "Если нужен список - только ключевые пункты. "
-        "Не задавай встречных вопросов, не объясняй свои действия. "
-    )
+# Вспомогательная функция для кодирования изображения в base64
+def encode_image(image_path: str) -> str:
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode("utf-8")
+
+
+async def download_photo_to_base64(bot, photo: types.PhotoSize) -> str:
+    """
+    Скачивает фото из Telegram и возвращает base64 строку
+    """
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
+        file = await bot.get_file(photo.file_id)
+        await bot.download_file(file.file_path, tmp.name)
+        tmp.flush()
+        return encode_image(tmp.name)
+
+
+async def get_ocr_response(caption: str, photos: list[types.PhotoSize], llm_code: str) -> str:
+    """
+    caption: текстовое описание / подпись
+    photos: список объектов types.PhotoSize из Telegram
+    llm_code: ключ из LLM_MODELS
+    """
+    llm = LLM_MODELS[llm_code]
+
+    system_prompt = f"""
+    Ты — Nerdinzzz 🤓, LLM чат-бот на базе {llm['name']}.
+    Твой создатель — @duckinzzz.
+    Твоя задача:
+    - Быстро и точно распознавать содержимое изображений.
+    - Преобразовывать текст с фото в текст (OCR) или давать краткий комментарий по изображению.
+    - Отвечать кратко, ясно и по делу, максимум 3-4 предложения.
+    - Если нужен список — только ключевые пункты.
+    - Используй нумерацию или маркеры для структурированных ответов, если необходимо.
+    - Не задавай встречных вопросов.
+    - Не объясняй свои действия и не добавляй приветствия или прощания.
+    - Всегда придерживайся нейтрального и дружелюбного тона.
+    - Не экранируй символы, кавычки или специальные знаки — выводи текст «как есть».
+    """
+
+    # Кодируем все фото в base64
+    encoded_photos = []
+    for photo in photos:
+        b64 = await download_photo_to_base64(bot, photo)
+        encoded_photos.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:image/jpeg;base64,{b64}"}
+        })
+
+    user_content = [{"type": "text", "text": caption}] + encoded_photos
+
     messages = [
-        {
-            "role": "system",
-            "content": system_prompt.lower()
-        },
-        {"role": "user", "content": user_prompt}
+        {"role": "system", "content": system_prompt.lower()},
+        {"role": "user", "content": user_content}
     ]
+
     kwargs = {
-        "model": llm,
+        "model": llm_code,
         "messages": messages,
         "temperature": 1,
         "max_completion_tokens": 1024,
@@ -32,7 +77,49 @@ async def get_llm_response(user_prompt: str, llm: str) -> str:
         "stop": None,
     }
 
-    if llm in LLM_WITH_REASONING:
+    if llm['reasoning']:
+        kwargs["reasoning_format"] = "hidden"
+
+    completion = await client.chat.completions.create(**kwargs)
+
+    return completion.choices[0].message.content
+
+
+async def get_llm_response(user_prompt: str, llm_code: str) -> str:
+    llm = LLM_MODELS[llm_code]
+
+    system_prompt = f"""
+    Ты — Nerdinzzz 🤓, LLM чат-бот на базе {llm['name']}.
+    Твой создатель — @duckinzzz.
+    Твоя задача:
+    - Быстро и точно отвечать на текстовые сообщения.
+    - Преобразовывать голосовые сообщения в текст (если требуется).
+    - Отвечать кратко, ясно и по делу, максимум 3-4 предложения.
+    - Если нужен список — только ключевые пункты.
+    - Используй нумерацию или маркеры для структурированных ответов, если необходимо.
+    - Не задавай встречных вопросов.
+    - Не объясняй свои действия и не добавляй приветствия или прощания.
+    - Всегда придерживайся нейтрального и дружелюбного тона.
+    - Не экранируй символы, кавычки или специальные знаки — выводи текст «как есть».
+    """
+    messages = [
+        {
+            "role": "system",
+            "content": system_prompt.lower()
+        },
+        {"role": "user", "content": user_prompt}
+    ]
+    kwargs = {
+        "model": llm_code,
+        "messages": messages,
+        "temperature": 1,
+        "max_completion_tokens": 1024,
+        "top_p": 1,
+        "stream": False,
+        "stop": None,
+    }
+
+    if llm['reasoning']:
         kwargs["reasoning_format"] = "hidden"
 
     completion = await client.chat.completions.create(**kwargs)

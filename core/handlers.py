@@ -4,10 +4,11 @@ from aiogram import Router, types, F
 from aiogram.filters import CommandStart, Command
 
 from core.app import bot
-from core.config import BOT_USERNAME
+from core.config import BOT_USERNAME, ADMIN_ID
 from core.constants import LLM_MODELS, SUPPORTED_MSG_TYPES
 from utils import llm_utils, stt_utils
 from utils.db_utils import get_chat_llm, set_chat_llm
+from utils.llm_utils import get_ocr_response
 from utils.logging_utils import log_message, logger
 
 start_router = Router()
@@ -30,6 +31,95 @@ async def cmd_start(message: types.Message):
 
     await message.answer(welcome_text, parse_mode="Markdown")
     logger.info(f"User {username} ({uid}) started the bot")
+
+
+import asyncio
+from collections import defaultdict
+from aiogram import types
+
+# Буфер для альбомов
+album_buffer: dict[str, list[types.Message]] = defaultdict(list)
+
+# Пример лимитов Groq
+MAX_IMAGES_PER_REQUEST = 5
+MAX_BASE64_MB = 4
+MAX_IMAGE_RESOLUTION_MP = 33  # мегапиксели
+
+
+def check_image_limits(message: types.Message) -> list[str]:
+    """Возвращает список ошибок по лимитам изображения"""
+    errors = []
+
+    # Размер файла в МБ
+    if message.photo[-1].file_size > MAX_BASE64_MB * 1024 * 1024:
+        errors.append(f"размер > {MAX_BASE64_MB} МБ")
+
+    # Разрешение в мегапикселях
+    width = message.photo[-1].width
+    height = message.photo[-1].height
+    if (width * height) / 1_000_000 > MAX_IMAGE_RESOLUTION_MP:
+        errors.append(f"разрешение > {MAX_IMAGE_RESOLUTION_MP} МП")
+
+    return errors
+
+
+@start_router.message(F.content_type == types.ContentType.PHOTO)
+async def handle_photo(message: types.Message):
+    chat_id = message.chat.id
+
+    # Проверяем LLM-модель чата
+    llm_code = await get_chat_llm(chat_id)
+    is_multimodal = LLM_MODELS.get(llm_code, {}).get("multimodal", False)
+    if not is_multimodal:
+        await message.answer(
+            "❌ Текущая модель не обрабатывает изображения, выберите другую:\n"
+            "`/set_llm meta-llama/llama-4-maverick-17b-128e-instruct`\n"
+            "`/set_llm meta-llama/llama-4-scout-17b-16e-instruct`"
+        )
+        return
+
+    # одиночное фото
+    if not message.media_group_id:
+        errors = check_image_limits(message)
+        if errors:
+            await message.answer(
+                f"❌ Изображение превышает лимиты:\n- " + "\n- ".join(errors)
+            )
+            return
+
+        caption = message.caption or "— подписи нет —"
+        response = await get_ocr_response(caption, [message.photo[-1]], llm_code)
+        await message.answer(str(response))
+        return
+
+    # альбом
+    media_id = message.media_group_id
+    album_buffer[media_id].append(message)
+
+    await asyncio.sleep(0.5)
+
+    if media_id not in album_buffer:
+        return
+
+    messages = album_buffer.pop(media_id)
+
+    if len(messages) > MAX_IMAGES_PER_REQUEST:
+        await message.answer(f"❌ Пришлите не больше {MAX_IMAGES_PER_REQUEST} изображений")
+        return
+
+    # Проверяем лимиты для каждого изображения
+    for idx, msg in enumerate(messages, 1):
+        errors = check_image_limits(msg)
+        if errors:
+            await message.answer(
+                f"❌ Изображение {idx} превышает лимиты:\n- " + "\n- ".join(errors)
+            )
+            return
+
+    caption = messages[0].caption or "— подписи нет —"
+    photos = [msg.photo[-1] for msg in messages]
+    response = await get_ocr_response(caption, photos, llm_code)
+    await message.answer(str(response))
 
 
 @start_router.message(F.content_type == "voice")
@@ -78,7 +168,7 @@ async def set_llm_handler(message: types.Message):
 
     if message.chat.type in ("group", "supergroup"):
         member = await bot.get_chat_member(chat_id=chat_id, user_id=message.from_user.id)
-        if member.status not in ("administrator", "creator"):
+        if message.from_user.id != ADMIN_ID or member.status not in ("administrator", "creator"):
             await message.answer("❌ Только админ может менять модель в группе")
             return
 
