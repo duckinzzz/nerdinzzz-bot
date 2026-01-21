@@ -116,7 +116,7 @@ async def handle_photo(message: types.Message):
             )
             return
 
-        caption = message.caption.replace(f"@{BOT_USERNAME}", '') or ""
+        caption = (message.caption or "").replace(f"@{BOT_USERNAME}", "").strip()
         response = await get_ocr_response(
             caption,
             [message.photo[-1]],
