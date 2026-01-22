@@ -39,9 +39,9 @@ def validate_photo_limits(photo: PhotoSize) -> None:
 
 async def send_response(message: Message, text: str) -> None:
     if message.chat.type in ("group", "supergroup"):
-        await message.reply(text)
+        await message.reply(text, parse_mode="Markdown")
     else:
-        await message.answer(text)
+        await message.answer(text, parse_mode="Markdown")
 
 
 async def check_multimodal_support(chat_id: int, message: Message) -> Optional[str]:
