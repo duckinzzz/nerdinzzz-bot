@@ -45,4 +45,5 @@ LLM_MODELS = {
 
 SUPPORTED_MSG_TYPES = ["text",
                        "voice",
-                       "video_note"]
+                       "video_note",
+                       "photo"]

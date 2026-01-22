@@ -99,7 +99,7 @@ async def handle_photo(message: types.Message):
     llm_code = await get_chat_llm(chat_id)
     is_multimodal = LLM_MODELS.get(llm_code, {}).get("multimodal", False)
     if not is_multimodal:
-        await message.answer(
+        await message.reply(
             "❌ Текущая модель не обрабатывает изображения, выберите другую:\n"
             "`/set_llm meta-llama/llama-4-maverick-17b-128e-instruct`\n"
             "`/set_llm meta-llama/llama-4-scout-17b-16e-instruct`",
@@ -111,7 +111,7 @@ async def handle_photo(message: types.Message):
     if not media_id:
         errors = check_image_limits(message)
         if errors:
-            await message.answer(
+            await message.reply(
                 "❌ Изображение превышает лимиты:\n- " + "\n- ".join(errors)
             )
             return
@@ -122,7 +122,7 @@ async def handle_photo(message: types.Message):
             [message.photo[-1]],
             llm_code
         )
-        await message.answer(str(response))
+        await message.reply(response)
         return
 
     # ---------- альбом ----------
@@ -136,7 +136,7 @@ async def handle_photo(message: types.Message):
 
     # лимит фото
     if len(messages) > MAX_IMAGES_PER_REQUEST:
-        await message.answer(
+        await message.reply(
             f"❌ Пришлите не больше {MAX_IMAGES_PER_REQUEST} изображений"
         )
         return
@@ -145,7 +145,7 @@ async def handle_photo(message: types.Message):
     for idx, msg in enumerate(messages, 1):
         errors = check_image_limits(msg)
         if errors:
-            await message.answer(
+            await message.reply(
                 f"❌ Изображение {idx} превышает лимиты:\n- " + "\n- ".join(errors)
             )
             return
@@ -154,7 +154,7 @@ async def handle_photo(message: types.Message):
     photos = [msg.photo[-1] for msg in messages]
 
     response = await get_ocr_response(caption, photos, llm_code)
-    await message.answer(response)
+    await message.reply(response)
 
 
 @start_router.message(F.content_type == "voice")
