@@ -24,10 +24,16 @@ class PhotoValidationError(Exception):
     pass
 
 
+def get_largest_photo(message: Message) -> PhotoSize:
+    if not message.photo:
+        raise ValueError("Сообщение не содержит фото")
+    return message.photo[-1]
+
+
 def validate_photo_limits(photo: PhotoSize) -> None:
     errors = []
 
-    if photo.file_size > MAX_BASE64_MB * 1024 * 1024:
+    if photo.file_size and photo.file_size > MAX_BASE64_MB * 1024 * 1024:
         errors.append(f"размер > {MAX_BASE64_MB} МБ")
 
     if (photo.width * photo.height) / 1_000_000 > MAX_IMAGE_RESOLUTION_MP:
@@ -62,13 +68,15 @@ async def check_multimodal_support(chat_id: int, message: Message) -> Optional[s
 
 async def process_single_photo(message: Message, llm_code: str) -> None:
     try:
-        validate_photo_limits(message.photo[-1])
+        photo = get_largest_photo(message)
+        validate_photo_limits(photo)
     except PhotoValidationError as e:
         await send_response(message, str(e))
         return
+
     caption = message.caption or ""
     caption = caption.replace(f"@{BOT_USERNAME}", "").strip()
-    response = await get_ocr_response(caption, [message.photo[-1]], llm_code)
+    response = await get_ocr_response(caption, [photo], llm_code)
 
     log_message(message=message, ocr_response=response, llm_code=llm_code)
     await send_response(message, response)
@@ -84,16 +92,18 @@ async def process_album(messages: list[Message], llm_code: str) -> None:
         )
         return
 
-    try:
-        for idx, msg in enumerate(messages, 1):
-            validate_photo_limits(msg.photo[-1])
-    except PhotoValidationError as e:
-        error_msg = str(e).replace("Изображение", f"Изображение {idx}")
-        await send_response(first_message, error_msg)
-        return
+    for idx, msg in enumerate(messages, 1):
+        try:
+            photo = get_largest_photo(msg)
+            validate_photo_limits(photo)
+        except PhotoValidationError as e:
+            error_msg = str(e).replace("Изображение", f"Изображение {idx}")
+            await send_response(first_message, error_msg)
+            return
+
     caption = first_message.caption or ""
     caption = caption.replace(f"@{BOT_USERNAME}", "").strip()
-    photos = [msg.photo[-1] for msg in messages]
+    photos = [get_largest_photo(msg) for msg in messages]
 
     response = await get_ocr_response(caption, photos, llm_code)
 
@@ -114,24 +124,23 @@ async def handle_photo(message: Message):
     caption = message.caption or ""
 
     if is_group:
-        if not media_id:  # одиночное фото
+        if not media_id:
             if not caption.startswith(f"@{BOT_USERNAME}"):
                 return
-        else:  # альбом
-            # Первое сообщение альбома
+        else:
             if media_id not in album_buffer:
                 if caption.startswith(f"@{BOT_USERNAME}"):
                     album_buffer[media_id] = []
                 else:
-                    # Помечаем альбом как игнорируемый
                     album_buffer[media_id] = None
                     return
 
-            # Альбом помечен как игнорируемый
             if album_buffer[media_id] is None:
                 return
 
-    llm_code = await check_multimodal_support(chat_id, message)
+    # Пока нет истории сообщений, изображения будут обрабатываться этой моделью
+    llm_code = "meta-llama/llama-4-maverick-17b-128e-instruct"
+    # llm_code = await check_multimodal_support(chat_id, message)
     if not llm_code:
         return
 
@@ -140,7 +149,6 @@ async def handle_photo(message: Message):
         return
 
     album_buffer[media_id].append(message)
-    # Ждём остальные фото из альбома
     await asyncio.sleep(0.5)
 
     messages = album_buffer.pop(media_id, None)
