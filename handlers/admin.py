@@ -1,3 +1,5 @@
+from textwrap import dedent
+
 from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
@@ -14,10 +16,25 @@ admin_router = Router()
 @admin_router.message(Command("set_llm"))
 async def set_llm_handler(message: Message):
     chat_id = message.chat.id
-    text = message.text.replace("/set_llm ", "").strip()
-
+    text = message.text.replace("/set_llm", "").strip()
     if not text:
-        await message.answer("❌ Укажите код модели после /set_llm")
+        ans = dedent("""
+        Введите /set_llm {модель}
+
+        <code>openai/gpt-oss-120b</code>
+        <code>openai/gpt-oss-20b</code>
+        <code>llama-3.1-8b-instant</code>
+        <code>llama-3.3-70b-versatile</code>
+        <code>qwen/qwen3-32b</code>
+        <code>moonshotai/kimi-k2-instruct-0905</code>
+
+        Принимают изображения:
+        <code>meta-llama/llama-4-maverick-17b-128e-instruct</code>
+        <code>meta-llama/llama-4-scout-17b-16e-instruct</code>
+        """).strip()
+
+        await message.reply(ans, parse_mode="HTML")
+
         return
 
     model_code = text
