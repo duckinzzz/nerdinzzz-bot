@@ -28,6 +28,8 @@ async def set_llm_handler(message: Message):
         <code>openai/gpt-oss-20b</code>
         <code>llama-3.1-8b-instant</code>
         <code>llama-3.3-70b-versatile</code>
+        <code>meta-llama/llama-4-maverick-17b-128e-instruct</code>
+        <code>meta-llama/llama-4-scout-17b-16e-instruct</code>
         <code>qwen/qwen3-32b</code>
         <code>moonshotai/kimi-k2-instruct-0905</code>
         """).strip()
