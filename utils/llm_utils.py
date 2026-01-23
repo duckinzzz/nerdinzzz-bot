@@ -1,4 +1,5 @@
 import base64
+import re
 import tempfile
 
 from aiogram import types
@@ -7,11 +8,25 @@ from groq import AsyncGroq
 from core.app import bot
 from core.config import LLM_TOKEN
 from core.constants import LLM_MODELS
+from utils.logging_utils import logger
 
 client = AsyncGroq(api_key=LLM_TOKEN)
 
 
-# Вспомогательная функция для кодирования изображения в base64
+def remove_reasoning_tags(text: str) -> str:
+    """
+    Удаляет reasoning теги из ответа модели.
+    Reasoning обычно обернут в <think>...</think> или <reasoning>...</reasoning>
+    """
+    # Удаляем <think>...</think>
+    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    # Удаляем <reasoning>...</reasoning>
+    text = re.sub(r'<reasoning>.*?</reasoning>', '', text, flags=re.DOTALL)
+    # Удаляем лишние пробелы и переносы строк
+    text = re.sub(r'\n\n+', '\n\n', text)
+    return text.strip()
+
+
 def encode_image(image_path: str) -> str:
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode("utf-8")
@@ -71,18 +86,39 @@ async def get_ocr_response(caption: str, photos: list[types.PhotoSize], llm_code
         "model": llm_code,
         "messages": messages,
         "temperature": 1,
-        "max_completion_tokens": 1024,
+        "max_completion_tokens": 4096,  # Увеличено для reasoning моделей
         "top_p": 1,
         "stream": False,
         "stop": None,
     }
 
-    if llm['reasoning']:
-        kwargs["reasoning_format"] = "hidden"
+    # Настройка reasoning для разных моделей
+    if llm.get('reasoning'):
+        # Для GPT-OSS моделей: используем low effort + показываем reasoning
+        if llm_code.startswith('openai/gpt-oss'):
+            kwargs["reasoning_effort"] = "low"  # минимальное рассуждение
+            # НЕ используем include_reasoning=False, т.к. это всё равно не отключает генерацию
+            # Вместо этого показываем reasoning пользователю
+        # Для Qwen моделей: можно полностью отключить
+        elif llm_code.startswith('qwen/'):
+            kwargs["reasoning_effort"] = "none"
 
-    completion = await client.chat.completions.create(**kwargs)
+    try:
+        completion = await client.chat.completions.create(**kwargs)
+        content = completion.choices[0].message.content
 
-    return completion.choices[0].message.content
+        if not content or not content.strip():
+            logger.error(
+                f"LLM {llm_code} returned empty content. "
+                f"Caption: {caption[:100]}"
+            )
+            return "❌ Модель не смогла ответить на ваш вопрос. Попробуйте другое изображение или модель."
+
+        return content.strip()
+
+    except Exception as e:
+        logger.error(f"Error in get_ocr_response: {e}")
+        return f"❌ Ошибка при обработке изображения: {str(e)}"
 
 
 async def get_llm_response(user_prompt: str, llm_code: str) -> str:
@@ -102,6 +138,7 @@ async def get_llm_response(user_prompt: str, llm_code: str) -> str:
     - Всегда придерживайся нейтрального и дружелюбного тона.
     - Не экранируй символы, кавычки или специальные знаки — выводи текст «как есть».
     """
+
     messages = [
         {
             "role": "system",
@@ -109,19 +146,41 @@ async def get_llm_response(user_prompt: str, llm_code: str) -> str:
         },
         {"role": "user", "content": user_prompt}
     ]
+
     kwargs = {
         "model": llm_code,
         "messages": messages,
         "temperature": 1,
-        "max_completion_tokens": 1024,
+        "max_completion_tokens": 4096,  # Увеличено для reasoning моделей
         "top_p": 1,
         "stream": False,
         "stop": None,
     }
 
-    if llm['reasoning']:
-        kwargs["reasoning_format"] = "hidden"
+    # Настройка reasoning для разных моделей
+    if llm.get('reasoning'):
+        # Для GPT-OSS моделей: используем low effort + показываем reasoning
+        if llm_code.startswith('openai/gpt-oss'):
+            kwargs["reasoning_effort"] = "low"  # минимальное рассуждение
+            # НЕ используем include_reasoning=False, т.к. это всё равно не отключает генерацию
+            # Вместо этого показываем reasoning пользователю
+        # Для Qwen моделей: можно полностью отключить
+        elif llm_code.startswith('qwen/'):
+            kwargs["reasoning_effort"] = "none"
 
-    completion = await client.chat.completions.create(**kwargs)
+    try:
+        completion = await client.chat.completions.create(**kwargs)
+        content = completion.choices[0].message.content
 
-    return completion.choices[0].message.content
+        if not content or not content.strip():
+            logger.error(
+                f"LLM {llm_code} returned empty content. "
+                f"Prompt: {user_prompt[:100]}"
+            )
+            return "❌ Модель не смогла ответить на ваш вопрос. Попробуйте переформулировать вопрос или сменить модель."
+
+        return content.strip()
+
+    except Exception as e:
+        logger.error(f"Error in get_llm_response: {e}")
+        return f"❌ Ошибка при обработке запроса: {str(e)}"

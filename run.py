@@ -19,6 +19,7 @@ async def on_startup(_: Application) -> None:
 async def on_shutdown(_: Application) -> None:
     await bot.delete_webhook()
     await bot.session.close()
+    await db_utils.close_db()
     logger.info(f"[{ENV}] Webhook removed, bot shutdown")
 
 

@@ -7,7 +7,7 @@ from aiogram.types import Message
 from core.app import bot
 from core.config import ADMIN_ID
 from core.constants import LLM_MODELS
-from utils.db_utils import set_chat_llm
+from utils.db_utils import set_chat_llm, get_chat_llm
 from utils.logging_utils import logger
 
 admin_router = Router()
@@ -16,10 +16,13 @@ admin_router = Router()
 @admin_router.message(Command("set_llm"))
 async def set_llm_handler(message: Message):
     chat_id = message.chat.id
+    curr_llm = await get_chat_llm(chat_id)
     text = message.text.replace("/set_llm", "").strip()
     if not text:
-        ans = dedent("""
-        Введите /set_llm {модель}
+        ans = dedent(f"""
+        Текущая модель в чате: <code>{curr_llm}</code>
+        
+        Введите /set_llm [модель]
 
         <code>openai/gpt-oss-120b</code>
         <code>openai/gpt-oss-20b</code>
@@ -27,10 +30,6 @@ async def set_llm_handler(message: Message):
         <code>llama-3.3-70b-versatile</code>
         <code>qwen/qwen3-32b</code>
         <code>moonshotai/kimi-k2-instruct-0905</code>
-
-        Принимают изображения:
-        <code>meta-llama/llama-4-maverick-17b-128e-instruct</code>
-        <code>meta-llama/llama-4-scout-17b-16e-instruct</code>
         """).strip()
 
         await message.reply(ans, parse_mode="HTML")

@@ -5,6 +5,7 @@ from asyncpg.pool import Pool
 
 from core.config import DATABASE_URL
 from core.constants import LLM_MODELS, DEFAULT_LLM
+from utils.logging_utils import logger
 
 pool: Pool
 chat_settings_cache: Dict[int, str] = {}
@@ -18,7 +19,12 @@ async def init_db() -> None:
     """
     global pool
 
-    pool = await asyncpg.create_pool(DATABASE_URL)  # type: ignore
+    pool = await asyncpg.create_pool(  # type: ignore
+        DATABASE_URL,
+        min_size=2,
+        max_size=10,
+        command_timeout=60
+    )
 
     async with pool.acquire() as conn:
         await conn.execute("""
@@ -36,8 +42,16 @@ async def init_db() -> None:
             );
         """)
 
+        # Индекс для быстрого поиска по llm_id (если понадобится аналитика)
+        await conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_chat_settings_llm_id 
+            ON chat_settings(llm_id);
+        """)
+
     await seed_llm_models()
     await load_chat_settings()
+
+    logger.info(f"Database initialized. Loaded {len(chat_settings_cache)} chat settings into cache")
 
 
 async def seed_llm_models() -> None:
@@ -49,7 +63,8 @@ async def seed_llm_models() -> None:
             await conn.execute("""
                 INSERT INTO llm_models (code, name)
                 VALUES ($1, $2)
-                ON CONFLICT (code) DO NOTHING
+                ON CONFLICT (code) DO UPDATE
+                SET name = EXCLUDED.name
             """, code, data["name"])
 
 
@@ -96,8 +111,12 @@ async def get_chat_llm(chat_id: int) -> str:
                 ORDER BY id LIMIT 1
             """)
 
+            if row is None:
+                raise RuntimeError("No LLM models available in database")
+
     llm_code = row["code"]
     await set_chat_llm(chat_id, llm_code)
+    logger.info(f"New chat {chat_id} initialized with default LLM: {llm_code}")
     return llm_code
 
 
@@ -105,6 +124,8 @@ async def set_chat_llm(chat_id: int, llm_code: str) -> None:
     """
     Set or update LLM for a chat using llm_code.
     llm_id is resolved internally.
+
+    Updates both database and cache for consistency.
     """
     async with pool.acquire() as conn:
         row = await conn.fetchrow("""
@@ -141,3 +162,13 @@ async def get_llm_id_by_code(code: str) -> Optional[int]:
         """, code)
 
     return row["id"] if row else None
+
+
+async def close_db() -> None:
+    """
+    Закрыть пул соединений при остановке бота
+    """
+    global pool
+    if pool:
+        await pool.close()
+        logger.info("Database pool closed")

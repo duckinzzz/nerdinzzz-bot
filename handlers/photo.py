@@ -118,7 +118,6 @@ async def process_album(messages: list[Message], llm_code: str) -> None:
 
 @photo_router.message(F.content_type == "photo")
 async def handle_photo(message: Message):
-    chat_id = message.chat.id
     media_id = message.media_group_id
     is_group = message.chat.type in ("group", "supergroup")
     caption = message.caption or ""
@@ -140,6 +139,7 @@ async def handle_photo(message: Message):
 
     # Пока нет истории сообщений, изображения будут обрабатываться этой моделью
     llm_code = "meta-llama/llama-4-maverick-17b-128e-instruct"
+    # chat_id = message.chat.id
     # llm_code = await check_multimodal_support(chat_id, message)
     if not llm_code:
         return
