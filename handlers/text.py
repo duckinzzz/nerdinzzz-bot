@@ -2,7 +2,7 @@ from aiogram import F, Router
 from aiogram.types import Message
 
 from core.config import BOT_USERNAME
-from utils import llm_utils
+from utils import llm_utils, tti_utils
 from utils.db_utils import get_chat_llm
 from utils.logging_utils import log_message
 
@@ -21,6 +21,30 @@ async def text_group_handler(message: Message):
     if not text:
         return
 
+    if text.lower().startswith("нарисуй"):
+        prompt = text.lower().replace("нарисуй", '').strip()
+
+        if not prompt:
+            await message.reply("❌ Укажите, что нарисовать")
+            return
+
+        ans = await message.reply('🖌️ Рисую...')
+        llm_prompt = await llm_utils.make_prompt(prompt)
+        if not llm_prompt:
+            log_message(message=message, tti_prompt=prompt, tti_status="prompt_error")
+            await message.reply("❌ Не получилось обработать промпт")
+            return
+        image = await tti_utils.generate_image(llm_prompt)
+        await ans.delete()
+
+        if image:
+            log_message(message=message, tti_prompt=prompt, tti_status="success")
+            await message.reply_photo(photo=image)
+        else:
+            log_message(message=message, tti_prompt=prompt, tti_status="failed")
+            await message.reply("❌ Не получилось сгенерировать изображение")
+        return
+
     llm_code = await get_chat_llm(chat_id)
     llm_response = await llm_utils.get_llm_response(text, llm_code)
 
@@ -32,6 +56,32 @@ async def text_group_handler(message: Message):
 async def text_private_handler(message: Message):
     text = message.text
     chat_id = message.chat.id
+
+    if text.lower().startswith("нарисуй"):
+        prompt = text.lower().replace("нарисуй", '').strip()
+
+        if not prompt:
+            await message.answer("❌ Укажите, что нарисовать")
+            return
+
+        ans = await message.answer('🖌️ Рисую...')
+        llm_prompt = await llm_utils.make_prompt(prompt)
+        if not llm_prompt:
+            log_message(message=message, tti_prompt=prompt, tti_status="prompt_error")
+            await message.answer("❌ Не получилось обработать промпт")
+            return
+
+        image = await tti_utils.generate_image(llm_prompt)
+        await ans.delete()
+
+        if image:
+            log_message(message=message, tti_prompt=prompt, tti_status="success")
+            await message.answer_photo(photo=image)
+        else:
+            log_message(message=message, tti_prompt=prompt, tti_status="failed")
+            await message.answer("❌ Не получилось сгенерировать изображение")
+
+        return
 
     llm_code = await get_chat_llm(chat_id)
     llm_response = await llm_utils.get_llm_response(text, llm_code)

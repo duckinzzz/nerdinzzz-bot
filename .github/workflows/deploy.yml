@@ -41,6 +41,9 @@ jobs:
             POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
             POSTGRES_DB=${{ secrets.POSTGRES_DB }}
             DATABASE_URL=${{ secrets.DATABASE_URL }}
+            
+            CF_ACCOUNT_ID=${{ secrets.CF_ACCOUNT_ID }}
+            CF_API_TOKEN=${{ secrets.CF_API_TOKEN }}
             EOF
 
             git fetch origin

@@ -184,3 +184,49 @@ async def get_llm_response(user_prompt: str, llm_code: str) -> str:
     except Exception as e:
         logger.error(f"Error in get_llm_response: {e}")
         return f"❌ Ошибка при обработке запроса: {str(e)}"
+
+
+async def make_prompt(user_prompt: str) -> str:
+    llm_code = 'openai/gpt-oss-120b'
+
+    system_prompt = f"""
+    Rewrite user input into a safe image generation prompt.
+    No violence. No realism. No cartoon. Just transform user input to text-to-image prompt. 
+    Return only the prompt. ENGLISH ONLY
+    """
+
+    messages = [
+        {
+            "role": "system",
+            "content": system_prompt.lower()
+        },
+        {"role": "user", "content": user_prompt}
+    ]
+
+    kwargs = {
+        "model": llm_code,
+        "messages": messages,
+        "temperature": 1,
+        "max_completion_tokens": 4096,
+        "top_p": 1,
+        "stream": False,
+        "stop": None,
+        "reasoning_effort": "low"
+    }
+
+    try:
+        completion = await client.chat.completions.create(**kwargs)
+        content = completion.choices[0].message.content
+
+        if not content or not content.strip():
+            logger.error(
+                f"LLM {llm_code} returned empty content. "
+                f"Prompt: {user_prompt[:100]}"
+            )
+            return ''
+
+        return content.strip()
+
+    except Exception as e:
+        logger.error(f"Error in make_prompt: {e}")
+        return ''
