@@ -31,24 +31,22 @@ async def text_group_handler(message: Message):
         ans = await message.reply('🖌️ Рисую...')
         llm_prompt = await llm_utils.make_prompt(prompt)
         if not llm_prompt:
-            log_message(message=message, tti_prompt=prompt, tti_status="prompt_error")
             await message.reply("❌ Не получилось обработать промпт")
             return
         image = await tti_utils.generate_image(llm_prompt)
         await ans.delete()
 
         if image:
-            log_message(message=message, tti_prompt=prompt, tti_status="success")
+            log_message(request_type='image_generation', message=message, llm_prompt=llm_prompt)
             await message.reply_photo(photo=image)
         else:
-            log_message(message=message, tti_prompt=prompt, tti_status="failed")
             await message.reply("❌ Не получилось сгенерировать изображение")
         return
 
     llm_code = await get_chat_llm(chat_id)
     llm_response = await llm_utils.get_llm_response(text, llm_code)
 
-    log_message(message=message, llm_response=llm_response, llm_code=llm_code)
+    log_message(request_type='llm_question', message=message, llm_response=llm_response, llm_code=llm_code)
     await message.reply(llm_response)
 
 
@@ -67,7 +65,6 @@ async def text_private_handler(message: Message):
         ans = await message.answer('🖌️ Рисую...')
         llm_prompt = await llm_utils.make_prompt(prompt)
         if not llm_prompt:
-            log_message(message=message, tti_prompt=prompt, tti_status="prompt_error")
             await message.answer("❌ Не получилось обработать промпт")
             return
 
@@ -75,10 +72,9 @@ async def text_private_handler(message: Message):
         await ans.delete()
 
         if image:
-            log_message(message=message, tti_prompt=prompt, tti_status="success")
+            log_message(request_type='image_generation', message=message, llm_prompt=llm_prompt)
             await message.answer_photo(photo=image)
         else:
-            log_message(message=message, tti_prompt=prompt, tti_status="failed")
             await message.answer("❌ Не получилось сгенерировать изображение")
 
         return
@@ -86,5 +82,5 @@ async def text_private_handler(message: Message):
     llm_code = await get_chat_llm(chat_id)
     llm_response = await llm_utils.get_llm_response(text, llm_code)
 
-    log_message(message=message, llm_response=llm_response, llm_code=llm_code)
+    log_message(request_type='llm_question', message=message, llm_response=llm_response, llm_code=llm_code)
     await message.answer(llm_response)

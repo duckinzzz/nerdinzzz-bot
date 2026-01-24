@@ -3,7 +3,7 @@ from aiogram.filters import CommandStart
 from aiogram.types import Message
 
 from core.config import BOT_USERNAME
-from utils.logging_utils import logger
+from utils.logging_utils import log_event
 
 base_router = Router()
 
@@ -25,4 +25,4 @@ async def cmd_start(message: Message):
     )
 
     await message.answer(welcome_text, parse_mode="Markdown")
-    logger.info(f"User {username} ({uid}) started the bot")
+    log_event(event='bot_start', username=username, user_id=uid, chat_id=message.chat.id)

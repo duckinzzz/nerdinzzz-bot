@@ -19,8 +19,8 @@ async def voice_handler(message: Message):
         await bot.download_file(file.file_path, destination=tmp.name)
         stt_response = await stt_utils.stt(tmp.name)
 
-        log_message(message=message, stt_response=stt_response)
-        await message.reply(stt_response)
+        log_message(request_type='stt_request', message=message, stt_response=stt_response)
+        await message.reply(stt_response if stt_response else '[тишина]')
 
 
 @voice_router.message(F.content_type == "video_note")
@@ -32,5 +32,5 @@ async def video_note_handler(message: Message):
         await bot.download_file(file.file_path, destination=tmp.name)
         stt_response = await stt_utils.stt_from_video(tmp.name)
 
-        log_message(message=message, stt_response=stt_response)
-        await message.reply(stt_response)
+        log_message(request_type='stt_request', message=message, stt_response=stt_response)
+        await message.reply(stt_response if stt_response else '[тишина]')

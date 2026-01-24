@@ -8,7 +8,7 @@ from groq import AsyncGroq
 from core.app import bot
 from core.config import LLM_TOKEN
 from core.constants import LLM_MODELS
-from utils.logging_utils import logger
+from utils.logging_utils import log_error
 
 client = AsyncGroq(api_key=LLM_TOKEN)
 
@@ -105,20 +105,17 @@ async def get_ocr_response(caption: str, photos: list[types.PhotoSize], llm_code
 
     try:
         completion = await client.chat.completions.create(**kwargs)
-        content = completion.choices[0].message.content
+        content = completion.choices[0].message.content.strip()
 
-        if not content or not content.strip():
-            logger.error(
-                f"LLM {llm_code} returned empty content. "
-                f"Caption: {caption[:100]}"
-            )
-            return "❌ Модель не смогла ответить на ваш вопрос. Попробуйте другое изображение или модель."
+        if not content:
+            log_error(request_type='process_image', caption=caption, error='empty_response')
+            return "❌ Модель не смогла ответить на ваш вопрос. Попробуйте другое изображение."
 
         return content.strip()
 
     except Exception as e:
-        logger.error(f"Error in get_ocr_response: {e}")
-        return f"❌ Ошибка при обработке изображения: {str(e)}"
+        log_error(request_type='process_image', caption=caption, error=e)
+        return f"❌ Ошибка при обработке изображения"
 
 
 async def get_llm_response(user_prompt: str, llm_code: str) -> str:
@@ -170,30 +167,29 @@ async def get_llm_response(user_prompt: str, llm_code: str) -> str:
 
     try:
         completion = await client.chat.completions.create(**kwargs)
-        content = completion.choices[0].message.content
+        content = completion.choices[0].message.content.strip()
 
-        if not content or not content.strip():
-            logger.error(
-                f"LLM {llm_code} returned empty content. "
-                f"Prompt: {user_prompt[:100]}"
-            )
+        if not content:
+            log_error(request_type='llm_question', user_prompt=user_prompt, error='empty_response')
             return "❌ Модель не смогла ответить на ваш вопрос. Попробуйте переформулировать вопрос или сменить модель."
 
         return content.strip()
 
     except Exception as e:
-        logger.error(f"Error in get_llm_response: {e}")
-        return f"❌ Ошибка при обработке запроса: {str(e)}"
+        log_error(request_type='llm_question', user_prompt=user_prompt, error=e)
+        return f"❌ Ошибка при обработке запроса"
 
 
 async def make_prompt(user_prompt: str) -> str:
-    llm_code = 'openai/gpt-oss-120b'
+    llm_code = 'moonshotai/kimi-k2-instruct-0905'
 
     system_prompt = f"""
-    Rewrite user input into a safe image generation prompt.
-    No violence. No realism. No cartoon. Just transform user input to text-to-image prompt. 
-    Return only the prompt. ENGLISH ONLY
-    """
+        Rewrite user input into image generation prompt.
+        No violence. More realistic style if not specified. 
+        Just transform user input to text-to-image prompt.
+        Return only the prompt.
+        ENGLISH ONLY
+        """
 
     messages = [
         {
@@ -210,23 +206,19 @@ async def make_prompt(user_prompt: str) -> str:
         "max_completion_tokens": 4096,
         "top_p": 1,
         "stream": False,
-        "stop": None,
-        "reasoning_effort": "low"
+        "stop": None
     }
 
     try:
         completion = await client.chat.completions.create(**kwargs)
-        content = completion.choices[0].message.content
+        prompt = completion.choices[0].message.content.strip()
 
-        if not content or not content.strip():
-            logger.error(
-                f"LLM {llm_code} returned empty content. "
-                f"Prompt: {user_prompt[:100]}"
-            )
+        if not prompt:
+            log_error(request_type='image_generation', user_prompt=user_prompt, error="generated_empty_prompt")
             return ''
 
-        return content.strip()
+        return prompt
 
     except Exception as e:
-        logger.error(f"Error in make_prompt: {e}")
+        log_error(request_type='image_generation', user_prompt=user_prompt, error=e)
         return ''

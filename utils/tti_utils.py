@@ -4,7 +4,7 @@ import aiohttp
 from aiogram.types import BufferedInputFile
 
 from core.config import CF_ACCOUNT_ID, CF_API_TOKEN
-from utils.logging_utils import logger
+from utils.logging_utils import log_error
 
 
 async def generate_image(prompt: str) -> BufferedInputFile | None:
@@ -37,5 +37,5 @@ async def generate_image(prompt: str) -> BufferedInputFile | None:
         return BufferedInputFile(img_bytes, filename="generated.png")
 
     except Exception as e:
-        logger.error(f"TTI generation error: {e}")
+        log_error(request_type='image_generation', user_prompt=prompt, error=e)
         return None

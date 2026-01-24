@@ -78,7 +78,12 @@ async def process_single_photo(message: Message, llm_code: str) -> None:
     caption = caption.replace(f"@{BOT_USERNAME}", "").strip()
     response = await get_ocr_response(caption, [photo], llm_code)
 
-    log_message(message=message, ocr_response=response, llm_code=llm_code)
+    log_message(message=message,
+                request_type='process_image',
+                amount=1,
+                caption=caption,
+                ocr_response=response,
+                llm_code=llm_code)
     await send_response(message, response)
 
 
@@ -109,9 +114,11 @@ async def process_album(messages: list[Message], llm_code: str) -> None:
 
     log_message(
         message=first_message,
+        request_type='process_image',
+        amount=len(messages),
+        caption=caption,
         ocr_response=response,
         llm_code=llm_code,
-        album_size=len(messages)
     )
     await send_response(first_message, response)
 

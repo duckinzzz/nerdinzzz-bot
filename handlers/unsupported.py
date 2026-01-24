@@ -12,5 +12,5 @@ unsupported_router = Router()
     F.chat.type == "private"
 )
 async def unsupported_handler(message: Message):
-    log_message(message=message)
+    log_message(request_type='unknown_type', message=message)
     await message.answer("❌ Неподдерживаемый формат сообщения")

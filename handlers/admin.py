@@ -8,7 +8,7 @@ from core.app import bot
 from core.config import ADMIN_ID
 from core.constants import LLM_MODELS
 from utils.db_utils import set_chat_llm, get_chat_llm
-from utils.logging_utils import logger
+from utils.logging_utils import log_event
 
 admin_router = Router()
 
@@ -54,4 +54,4 @@ async def set_llm_handler(message: Message):
         f"Модель `{LLM_MODELS[model_code]['name']}` установлена ✅",
         parse_mode="Markdown"
     )
-    logger.warning(f"Chat {chat_id}: LLM changed to {model_code} by {message.from_user.id}")
+    log_event(event='llm_change', chat_id=chat_id, model_code=model_code, by_user=message.from_user.id)
