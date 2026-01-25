@@ -216,7 +216,9 @@ async def make_prompt(user_prompt: str) -> str:
         if not prompt:
             log_error(request_type='image_generation', user_prompt=user_prompt, error="generated_empty_prompt")
             return ''
-
+        if 'I can’t help with'.lower() in prompt.lower():
+            log_error(request_type='image_generation', user_prompt=user_prompt, error="prompt_restricted")
+            return ''
         return prompt
 
     except Exception as e:
