@@ -10,10 +10,15 @@ services:
     logging:
       driver: "json-file"
       options:
-        max-size: "50m"
-        max-file: "3"
-    labels:
-      logging: "nerdinzzz"
+        max-size: "10m"
+        max-file: "1"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 200M
+        reservations:
+          memory: 100M
 
   loki:
     image: grafana/loki:latest
@@ -28,6 +33,13 @@ services:
       - ./logging/loki/loki-retention:/loki/retention
       - ./logging/loki/loki-wal:/loki/wal
     command: -config.file=/etc/loki/local-config.yaml
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 300M
+        reservations:
+          memory: 200M
 
   promtail:
     image: grafana/promtail:latest
@@ -38,6 +50,13 @@ services:
     command: -config.file=/etc/promtail/config.yml
     depends_on:
       - loki
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 100M
+        reservations:
+          memory: 50M
 
   grafana:
     image: grafana/grafana:latest
@@ -53,3 +72,11 @@ services:
       - loki
     env_file:
       - .env
+    profiles: ["monitoring"]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.3"
+          memory: 300M
+        reservations:
+          memory: 200M
