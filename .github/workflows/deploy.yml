@@ -70,5 +70,7 @@ jobs:
             EOF
 
             IMAGE_TAG=${{ github.sha }}
+
             docker pull ghcr.io/${{ github.repository }}:$IMAGE_TAG
-            docker compose up -d --pull=always --force-recreate
+            docker compose pull
+            docker compose up -d --force-recreate --remove-orphans

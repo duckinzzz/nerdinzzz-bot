@@ -1,5 +1,6 @@
 from aiogram import F, Router
 from aiogram.types import Message, BufferedInputFile
+from groq import RateLimitError
 
 from core.config import BOT_USERNAME
 from utils import llm_utils, tti_utils, tts_utils
@@ -53,19 +54,32 @@ async def text_group_handler(message: Message):
         if not prompt:
             await message.reply("❌ Укажите, что сказать")
             return
+
+        if not any(char.isalpha() for char in prompt):
+            await message.reply("❌ Нужна хотя бы одна буква")
+            return
+
         if len(prompt) > 200:
             await message.reply("❌ 200 символов максимум")
             return
 
         ans = await message.reply('🗣 Ща выдам...')
 
-        voice = await tts_utils.generate_voice(prompt)
-
-        await ans.delete()
-        log_message(request_type='text_to_speech', message=message)
         try:
+            voice = await tts_utils.generate_voice(prompt)
+            await ans.delete()
             await message.reply_voice(BufferedInputFile(voice, 'voice'))
+
+        except RateLimitError as e:
+            await ans.delete()
+            wait_time = getattr(e, "wait_time", None)
+            if wait_time:
+                await message.reply(f"⏳ Подождите {wait_time}")
+            else:
+                await message.reply("⏳ Слишком много запросов")
+
         except Exception as e:
+            await ans.delete()
             log_error(request_type='text_to_speech', message=message, error=e)
             await message.reply("❌ Не смог выговорить")
 
@@ -116,19 +130,32 @@ async def text_private_handler(message: Message):
         if not prompt:
             await message.answer("❌ Укажите, что сказать")
             return
+
+        if not any(char.isalpha() for char in prompt):
+            await message.answer("❌ Нужна хотя бы одна буква")
+            return
+
         if len(prompt) > 200:
             await message.answer("❌ 200 символов максимум")
             return
 
         ans = await message.answer('🗣 Ща выдам...')
 
-        voice = await tts_utils.generate_voice(prompt)
-
-        await ans.delete()
-        log_message(request_type='text_to_speech', message=message)
         try:
+            voice = await tts_utils.generate_voice(prompt)
+            await ans.delete()
             await message.answer_voice(BufferedInputFile(voice, 'voice'))
+
+        except RateLimitError as e:
+            await ans.delete()
+            wait_time = getattr(e, "wait_time", None)
+            if wait_time:
+                await message.answer(f"⏳ Подождите {wait_time}")
+            else:
+                await message.answer("⏳ Слишком много запросов")
+
         except Exception as e:
+            await ans.delete()
             log_error(request_type='text_to_speech', message=message, error=e)
             await message.answer("❌ Не смог выговорить")
 
