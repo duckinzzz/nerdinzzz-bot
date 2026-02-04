@@ -150,7 +150,7 @@ async def text_private_handler(message: Message):
             await ans.delete()
             wait_time = getattr(e, "wait_time", None)
             if wait_time:
-                await message.answer(f"⏳ Подождите {wait_time}")
+                await message.answer(f"⏳ Подождите {wait_time}, или попробуйте менее длинное сообщение")
             else:
                 await message.answer("⏳ Слишком много запросов")
 
