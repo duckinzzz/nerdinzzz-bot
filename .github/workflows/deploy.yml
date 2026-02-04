@@ -23,13 +23,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
+      - name: Extract Docker image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=sha,prefix=
+            type=ref,name=latest
+
       - name: Build and push image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: |
-            ghcr.io/${{ github.repository }}:latest
+          tags: ${{ steps.meta.outputs.tags }}
 
   deploy:
     needs: build
@@ -71,5 +79,6 @@ jobs:
             CF_API_TOKEN=${{ secrets.CF_API_TOKEN }}
             EOF
 
-            docker pull ghcr.io/${{ github.repository }}:latest
-            docker compose up -d --remove-orphans
+            IMAGE_TAG=$(echo "${{ steps.meta.outputs.tags }}" | cut -d',' -f1)
+            docker pull ghcr.io/${{ github.repository }}:$IMAGE_TAG
+            docker compose up -d --pull=always --force-recreate
