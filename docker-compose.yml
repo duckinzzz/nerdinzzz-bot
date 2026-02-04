@@ -20,63 +20,63 @@ services:
         reservations:
           memory: 100M
 
-  loki:
-    image: grafana/loki:latest
-    container_name: loki
-    ports:
-      - "3100:3100"
-    volumes:
-      - ./logging/loki/local-config.yaml:/etc/loki/local-config.yaml:ro
-      - ./logging/loki/loki-chunks:/loki/chunks
-      - ./logging/loki/loki-index:/loki/index
-      - ./logging/loki/loki-index_cache:/loki/index_cache
-      - ./logging/loki/loki-retention:/loki/retention
-      - ./logging/loki/loki-wal:/loki/wal
-    command: -config.file=/etc/loki/local-config.yaml
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 300M
-        reservations:
-          memory: 200M
-
-  promtail:
-    image: grafana/promtail:latest
-    container_name: promtail
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./logging/promtail/promtail.yml:/etc/promtail/config.yml:ro
-    command: -config.file=/etc/promtail/config.yml
-    depends_on:
-      - loki
-    deploy:
-      resources:
-        limits:
-          cpus: "0.1"
-          memory: 100M
-        reservations:
-          memory: 50M
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: grafana
-    volumes:
-      - ./logging/grafana/custom.ini:/etc/grafana/grafana.ini
-      - ./logging/grafana/provisioning:/etc/grafana/provisioning
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PW}
-    ports:
-      - "3000:3000"
-    depends_on:
-      - loki
-    env_file:
-      - .env
-    profiles: ["monitoring"]
-    deploy:
-      resources:
-        limits:
-          cpus: "0.3"
-          memory: 300M
-        reservations:
-          memory: 200M
+#  loki:
+#    image: grafana/loki:latest
+#    container_name: loki
+#    ports:
+#      - "3100:3100"
+#    volumes:
+#      - ./logging/loki/local-config.yaml:/etc/loki/local-config.yaml:ro
+#      - ./logging/loki/loki-chunks:/loki/chunks
+#      - ./logging/loki/loki-index:/loki/index
+#      - ./logging/loki/loki-index_cache:/loki/index_cache
+#      - ./logging/loki/loki-retention:/loki/retention
+#      - ./logging/loki/loki-wal:/loki/wal
+#    command: -config.file=/etc/loki/local-config.yaml
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: "0.5"
+#          memory: 300M
+#        reservations:
+#          memory: 200M
+#
+#  promtail:
+#    image: grafana/promtail:latest
+#    container_name: promtail
+#    volumes:
+#      - /var/run/docker.sock:/var/run/docker.sock:ro
+#      - ./logging/promtail/promtail.yml:/etc/promtail/config.yml:ro
+#    command: -config.file=/etc/promtail/config.yml
+#    depends_on:
+#      - loki
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: "0.1"
+#          memory: 100M
+#        reservations:
+#          memory: 50M
+#
+#  grafana:
+#    image: grafana/grafana:latest
+#    container_name: grafana
+#    volumes:
+#      - ./logging/grafana/custom.ini:/etc/grafana/grafana.ini
+#      - ./logging/grafana/provisioning:/etc/grafana/provisioning
+#    environment:
+#      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PW}
+#    ports:
+#      - "3000:3000"
+#    depends_on:
+#      - loki
+#    env_file:
+#      - .env
+#    profiles: ["monitoring"]
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: "0.3"
+#          memory: 300M
+#        reservations:
+#          memory: 200M
