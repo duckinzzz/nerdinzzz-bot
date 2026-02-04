@@ -1,6 +1,6 @@
 services:
   bot:
-    build: .
+    image: ghcr.io/duckinzzz/nerdinzzz-bot:latest
     container_name: nerdinzzz-bot
     restart: unless-stopped
     env_file:
@@ -12,13 +12,9 @@ services:
       options:
         max-size: "10m"
         max-file: "1"
-    deploy:
-      resources:
-        limits:
-          cpus: "0.2"
-          memory: 200M
-        reservations:
-          memory: 100M
+    mem_limit: 300m
+    mem_reservation: 100m
+    cpus: 0.20
 
 #  loki:
 #    image: grafana/loki:latest
