@@ -53,6 +53,7 @@ jobs:
             BOT_USERNAME=${{ secrets.BOT_USERNAME }}
             LLM_TOKEN=${{ secrets.LLM_TOKEN }}
             STT_TOKEN=${{ secrets.STT_TOKEN }}
+            TTS_TOKEN=${{ secrets.STT_TOKEN }}
 
             GRAFANA_ADMIN_PW=${{ secrets.GRAFANA_ADMIN_PW }}
             
