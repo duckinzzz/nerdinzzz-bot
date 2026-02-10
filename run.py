@@ -36,5 +36,23 @@ def main():
     web.run_app(app, host=WEBHOOK_HOST, port=WEBHOOK_PORT)
 
 
+async def main_polling():
+    logger.info(f"[{ENV}] Starting bot in long-polling mode...")
+    await db_utils.init_db()
+    dp.include_router(get_main_router())
+    await bot.delete_webhook(drop_pending_updates=True)
+    try:
+        await dp.start_polling(bot, skip_updates=True)
+    finally:
+        await db_utils.close_db()
+        await bot.session.close()
+        logger.info(f"[{ENV}] Bot stopped, session closed.")
+
+
 if __name__ == "__main__":
-    main()
+    if ENV == "dev":
+        import asyncio
+
+        asyncio.run(main_polling())
+    else:
+        main()

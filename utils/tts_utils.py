@@ -7,6 +7,7 @@ from groq import Groq
 from groq import RateLimitError
 
 from core.config import TTS_TOKEN
+from utils.logging_utils import log_error
 
 client = Groq(api_key=TTS_TOKEN)
 
@@ -49,7 +50,8 @@ def format_wait_time(raw_time: str) -> str:
         if td.seconds % 60 > 0:
             parts.append(f"{td.seconds % 60}с")
         return " ".join(parts) or "менее секунды"
-    except Exception:
+    except Exception as e:
+        log_error(request_type='format_wait_time', error=e)
         return raw_time
 
 
@@ -74,4 +76,3 @@ async def generate_voice(prompt: str) -> bytes:
         match = re.search(r"Please try again in ([\dhms]+)", text)
         e.wait_time = format_wait_time(match.group(1)) if match else None
         raise
-

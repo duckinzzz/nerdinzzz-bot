@@ -2,11 +2,19 @@ import tempfile
 
 import ffmpeg
 import imageio_ffmpeg as iio
+import unicodedata
 from groq import Groq
 
 from core.config import STT_TOKEN
+from core.constants import HALLUCINATIONS
 
 client = Groq(api_key=STT_TOKEN)
+
+
+
+
+def normalize(text: str) -> str:
+    return unicodedata.normalize("NFKC", text).strip().casefold()
 
 
 async def stt(path: str) -> str:
@@ -17,7 +25,8 @@ async def stt(path: str) -> str:
             response_format="text",
             temperature=0
         )
-    return str(result)
+    result = normalize(str(result))
+    return result if result not in HALLUCINATIONS else '[тишина]'
 
 
 async def stt_from_video(video_path: str) -> str:

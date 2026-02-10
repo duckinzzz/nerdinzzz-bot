@@ -47,3 +47,11 @@ SUPPORTED_MSG_TYPES = ["text",
                        "voice",
                        "video_note",
                        "photo"]
+HALLUCINATIONS = {
+    'thanks for watching!',
+    'thank you.',
+    'thank you for watching.',
+    'preparation for cooking',
+    'you',
+    'субтитры сделал dimatorzok',
+}

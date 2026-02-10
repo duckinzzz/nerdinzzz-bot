@@ -1,6 +1,5 @@
 import tempfile
 
-import unicodedata
 from aiogram import F, Router
 from aiogram.types import Message
 
@@ -9,19 +8,6 @@ from utils import stt_utils
 from utils.logging_utils import log_message
 
 voice_router = Router()
-
-hallucinations = {
-    'thanks for watching!',
-    'thank you.',
-    'thank you for watching.',
-    'preparation for cooking',
-    'you',
-    'субтитры сделал dimatorzok',
-}
-
-
-def normalize(text: str) -> str:
-    return unicodedata.normalize("NFKC", text).strip().casefold()
 
 
 @voice_router.message(F.content_type == "voice")
@@ -32,12 +18,8 @@ async def voice_handler(message: Message):
     with tempfile.NamedTemporaryFile(suffix=".ogg") as tmp:
         await bot.download_file(file.file_path, destination=tmp.name)
         stt_response = await stt_utils.stt(tmp.name)
-        clean = normalize(stt_response)
-
         log_message(request_type='stt_request', message=message, stt_response=stt_response)
-        await message.reply(
-            stt_response.strip() if clean not in hallucinations else '[тишина]'
-        )
+        await message.reply(stt_response)
 
 
 @voice_router.message(F.content_type == "video_note")
@@ -47,10 +29,6 @@ async def video_note_handler(message: Message):
 
     with tempfile.NamedTemporaryFile(suffix=".mp4") as tmp:
         await bot.download_file(file.file_path, destination=tmp.name)
-        stt_response = await stt_utils.stt(tmp.name)
-        clean = normalize(stt_response)
-
+        stt_response = await stt_utils.stt_from_video(tmp.name)
         log_message(request_type='stt_request', message=message, stt_response=stt_response)
-        await message.reply(
-            stt_response.strip() if clean not in hallucinations else '[тишина]'
-        )
+        await message.reply(stt_response)
