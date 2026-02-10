@@ -55,3 +55,6 @@ HALLUCINATIONS = {
     'you',
     'субтитры сделал dimatorzok',
 }
+
+REACT_EMOJIS = ["🍌", "🍓", "💯", "🎉", "🏆", "🤓"]
+EMOJIS_WEIGHTS = [50, 25, 15, 7, 3, 1]
