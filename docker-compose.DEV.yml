@@ -3,8 +3,11 @@ services:
     build: .
     container_name: nerdinzzz-bot
     restart: unless-stopped
+    command: sh -c "watchfiles --ignore-paths .venv --ignore-paths .idea 'python run.py' ."
     env_file:
       - .env
+    volumes:
+      - .:/app
     ports:
       - "8080:8080"
     logging:

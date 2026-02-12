@@ -2,31 +2,43 @@ import tempfile
 
 import ffmpeg
 import imageio_ffmpeg as iio
-import unicodedata
 from groq import Groq
 
 from core.config import STT_TOKEN
 from core.constants import HALLUCINATIONS
+from utils.logging_utils import log_event
 
 client = Groq(api_key=STT_TOKEN)
 
+import unicodedata
 
 
+def process_transcription(result):
+    if not result.segments:
+        return '[тишина]'
 
-def normalize(text: str) -> str:
-    return unicodedata.normalize("NFKC", text).strip().casefold()
+    avg_logprob = sum(s['avg_logprob'] for s in result.segments) / len(result.segments)
+
+    norm_text = unicodedata.normalize("NFKC", result.text).casefold().strip('.!?, ')
+    if not norm_text:
+        return '[тишина]'
+
+    if norm_text in HALLUCINATIONS or avg_logprob < -1.0:
+        return '[тишина]'
+
+    return result.text
 
 
 async def stt(path: str) -> str:
     with open(path, "rb") as audio:
-        result = client.audio.transcriptions.create(
+        response = client.audio.transcriptions.create(
             file=audio,
             model="whisper-large-v3",
-            response_format="text",
+            response_format="verbose_json",
             temperature=0
         )
-    result = normalize(str(result))
-    return result if result not in HALLUCINATIONS else '[тишина]'
+    log_event(event='transcription', data=response.model_dump())
+    return process_transcription(response)
 
 
 async def stt_from_video(video_path: str) -> str:
