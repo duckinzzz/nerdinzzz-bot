@@ -61,7 +61,7 @@ async def text_group_handler(message: Message):
             return
 
         if len(prompt) > 200:
-            await message.reply("❌ 200 символов максимум")
+            await message.reply(f"❌ Лимит символов ({len(prompt)}/200)")
             return
 
         ans = await message.reply('🗣 Ща выдам...')
@@ -138,7 +138,7 @@ async def text_private_handler(message: Message):
             return
 
         if len(prompt) > 200:
-            await message.answer("❌ 200 символов максимум")
+            await message.answer(f"❌ Лимит символов ({len(prompt)}/200)")
             return
 
         ans = await message.answer('🗣 Ща выдам...')
