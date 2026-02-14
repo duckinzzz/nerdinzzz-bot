@@ -1,6 +1,7 @@
 from aiogram import F, Router
 from aiogram.types import Message, BufferedInputFile
 from groq import RateLimitError
+from telegramify_markdown import convert
 
 from core.config import BOT_USERNAME
 from utils import llm_utils, tti_utils, tts_utils
@@ -87,9 +88,10 @@ async def text_group_handler(message: Message):
 
     llm_code = await get_chat_llm(chat_id)
     llm_response = await llm_utils.get_llm_response(text, llm_code)
+    text, entities = convert(llm_response)
 
     log_message(request_type='llm_question', message=message, llm_response=llm_response, llm_code=llm_code)
-    await message.reply(llm_response)
+    await message.reply(text, entities=[e.to_dict() for e in entities])
 
 
 @text_router.message(F.content_type == "text", F.chat.type == "private")
@@ -163,6 +165,7 @@ async def text_private_handler(message: Message):
 
     llm_code = await get_chat_llm(chat_id)
     llm_response = await llm_utils.get_llm_response(text, llm_code)
+    text, entities = convert(llm_response)
 
     log_message(request_type='llm_question', message=message, llm_response=llm_response, llm_code=llm_code)
-    await message.answer(llm_response)
+    await message.answer(text, entities=[e.to_dict() for e in entities])
