@@ -14,11 +14,11 @@ text_router = Router()
 @text_router.message(
     F.content_type == "text",
     F.chat.type.in_(["group", "supergroup"]),
-    lambda m: m.text and m.text.startswith(f"@{BOT_USERNAME} ")
+    lambda m: m.text and m.text.startswith(f"@{BOT_USERNAME}")
 )
 async def text_group_handler(message: Message):
     chat_id = message.chat.id
-    text = message.text.replace(f'@{BOT_USERNAME} ', '').strip()
+    text = message.text.replace(f'@{BOT_USERNAME}', '').strip()
 
     if not text:
         return
