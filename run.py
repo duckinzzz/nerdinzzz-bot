@@ -12,7 +12,7 @@ from utils.logging_utils import logger
 async def on_startup(_: Application) -> None:
     await db_utils.init_db()
     dp.include_router(get_main_router())
-    await bot.set_webhook(url=WEBHOOK_URL, drop_pending_updates=True)
+    await bot.set_webhook(url=WEBHOOK_URL, drop_pending_updates=True, allowed_updates=[])
     logger.info(f"[{ENV}] Webhook set to {WEBHOOK_URL}")
 
 
