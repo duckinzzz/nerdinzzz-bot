@@ -1,10 +1,8 @@
-from textwrap import dedent
-
-from aiogram import Router
-from aiogram.filters import Command
+from aiogram import Router, Bot
+from aiogram.filters import Command, CommandObject
+from aiogram.types import ChatMemberAdministrator, ChatMemberOwner
 from aiogram.types import Message
 
-from core.app import bot
 from core.config import ADMIN_ID
 from core.constants import LLM_MODELS
 from utils.db_utils import set_chat_llm, get_chat_llm
@@ -14,44 +12,37 @@ admin_router = Router()
 
 
 @admin_router.message(Command("set_llm"))
-async def set_llm_handler(message: Message):
+async def set_llm_handler(message: Message, command: CommandObject, bot: Bot):
     chat_id = message.chat.id
-    curr_llm = await get_chat_llm(chat_id)
-    text = message.text.replace("/set_llm", "").strip()
-    if not text:
-        ans = dedent(f"""
-        Текущая модель в чате: <code>{curr_llm}</code>
-        
-        Введите /set_llm [модель]
 
-        <code>openai/gpt-oss-120b</code>
-        <code>openai/gpt-oss-20b</code>
-        <code>llama-3.1-8b-instant</code>
-        <code>llama-3.3-70b-versatile</code>
-        <code>meta-llama/llama-4-maverick-17b-128e-instruct</code>
-        <code>meta-llama/llama-4-scout-17b-16e-instruct</code>
-        <code>qwen/qwen3-32b</code>
-        <code>moonshotai/kimi-k2-instruct-0905</code>
-        """).strip()
+    if not command.args:
+        curr_llm = await get_chat_llm(chat_id)
+        models_list = "\n".join([f"<code>{code}</code>" for code in LLM_MODELS.keys()])
 
-        await message.reply(ans, parse_mode="HTML")
+        ans = (
+            f"Текущая модель: <code>{curr_llm}</code>\n\n"
+            f"Введите <code>/set_llm [модель]</code>\n\n"
+            f"{models_list}"
+        )
+        return await message.reply(ans, parse_mode="HTML")
 
-        return
-
-    model_code = text
+    model_code = command.args.strip()
     if model_code not in LLM_MODELS:
-        await message.answer("❌ Такой модели нет")
-        return
+        return await message.reply("❌ Такой модели нет в списке доступных")
 
     if message.chat.type in ("group", "supergroup"):
-        member = await bot.get_chat_member(chat_id=chat_id, user_id=message.from_user.id)
-        if message.from_user.id != ADMIN_ID and member.status not in ("administrator", "creator"):
-            await message.answer("❌ Только админ может менять модель в группе")
-            return
+        member = await bot.get_chat_member(chat_id, message.from_user.id)
+        if message.from_user.id != ADMIN_ID and not isinstance(member, (ChatMemberAdministrator, ChatMemberOwner)):
+            return await message.answer("❌ Только админ может менять модель в группе")
 
     await set_chat_llm(chat_id, model_code)
-    await message.answer(
-        f"Модель `{LLM_MODELS[model_code]['name']}` установлена ✅",
-        parse_mode="Markdown"
+
+    model_name = LLM_MODELS[model_code].get('name', model_code)
+
+    log_event(
+        event='llm_change',
+        chat_id=chat_id,
+        model_code=model_code,
+        by_user=message.from_user.id
     )
-    log_event(event='llm_change', chat_id=chat_id, model_code=model_code, by_user=message.from_user.id)
+    return await message.answer(f"✅ Установлена модель: *{model_name}*", parse_mode="Markdown")
