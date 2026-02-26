@@ -1,12 +1,12 @@
 services:
-  bot:
+  nerdinzzz-bot:
     image: ghcr.io/duckinzzz/nerdinzzz-bot:latest
     container_name: nerdinzzz-bot
     restart: unless-stopped
     env_file:
       - .env
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
     logging:
       driver: "json-file"
       options:
@@ -15,6 +15,22 @@ services:
     mem_limit: 300m
     mem_reservation: 100m
     cpus: 0.20
+    networks:
+      - proxy
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.webhook_nerd.rule=Host(`webhook.duckinzzz.ru`) && PathPrefix(`/nerdinzzz`)"
+      - "traefik.http.routers.webhook_nerd.entrypoints=websecure"
+      - "traefik.http.routers.webhook_nerd.tls=true"
+      - "traefik.http.services.webhook_nerd.loadbalancer.server.port=8080"
+
+networks:
+  proxy:
+    external: true
 
 #  loki:
 #    image: grafana/loki:latest
