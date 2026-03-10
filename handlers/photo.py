@@ -145,7 +145,7 @@ async def handle_photo(message: Message):
                 return
 
     # Пока нет истории сообщений, изображения будут обрабатываться этой моделью
-    llm_code = "meta-llama/llama-4-maverick-17b-128e-instruct"
+    llm_code = "meta-llama/llama-4-scout-17b-16e-instruct"
     # chat_id = message.chat.id
     # llm_code = await check_multimodal_support(chat_id, message)
     if not llm_code:
