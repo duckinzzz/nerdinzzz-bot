@@ -1,17 +1,20 @@
+import asyncio
+
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 from aiohttp import web
 from aiohttp.web_app import Application
-
 from core.app import bot, dp
 from core.config import WEBHOOK_HOST, WEBHOOK_PORT, WEBHOOK_PATH, ENV, WEBHOOK_URL
 from handlers import get_main_router
 from utils import db_utils
 from utils.logging_utils import logger
+from utils.scheduler import run_daily_cleanup
 
 
 async def on_startup(_: Application) -> None:
     await db_utils.init_db()
     dp.include_router(get_main_router())
+    asyncio.create_task(run_daily_cleanup(bot))
     await bot.set_webhook(url=WEBHOOK_URL, drop_pending_updates=True, allowed_updates=[])
     logger.info(f"[{ENV}] Webhook set to {WEBHOOK_URL}")
 
@@ -40,6 +43,7 @@ async def main_polling():
     logger.info(f"[{ENV}] Starting bot in long-polling mode...")
     await db_utils.init_db()
     dp.include_router(get_main_router())
+    asyncio.create_task(run_daily_cleanup(bot))
     await bot.delete_webhook(drop_pending_updates=True)
     try:
         await dp.start_polling(bot, skip_updates=True)
@@ -51,8 +55,6 @@ async def main_polling():
 
 if __name__ == "__main__":
     if ENV == "dev":
-        import asyncio
-
         asyncio.run(main_polling())
     else:
         main()

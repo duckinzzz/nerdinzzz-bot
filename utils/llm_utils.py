@@ -224,3 +224,75 @@ async def make_prompt(user_prompt: str) -> str:
     except Exception as e:
         log_error(request_type='image_generation', user_prompt=user_prompt, error=e)
         return ''
+
+
+async def generate_summary(messages_json: list[dict], chat_id: int, total_count: int, bot_username: str) -> str:
+    """
+    Генерирует саммари по сообщениям чата.
+
+    messages_json: список словарей вида {username, text, message_id}
+    chat_id: ID чата
+    total_count: количество сообщений
+    bot_username: юзернейм бота (для фильтрации его ответов)
+
+    Возвращает саммари в формате:
+    🤓 AI проанализировал N сообщений.
+    Вот что вы пропустили:
+    [Темы с описанием]
+    """
+    from core.constants import SUMMARY_MODEL, SUMMARY_PROMPT
+
+    system_prompt = SUMMARY_PROMPT
+
+    # Формируем контекст из сообщений, исключая ответы бота
+    messages_text = []
+    for msg in messages_json:
+        username = msg.get('username') or f"user_{msg['user_id']}"
+        if not username.startswith('@'):
+            username = f"@{username}"
+
+        # Пропускаем сообщения от бота (но оставляем запросы к нему)
+        if username.lower() == f"@{bot_username}".lower():
+            continue
+
+        text = msg.get('text', '')
+        messages_text.append(f"{username}: {text}")
+
+    context = "\n".join(messages_text)
+
+    user_prompt = f"""Количество сообщений (без ответов бота): {total_count}
+
+Сообщения:
+{context}
+
+Сделай саммари на русском языке."""
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt}
+    ]
+
+    kwargs = {
+        "model": SUMMARY_MODEL,
+        "messages": messages,
+        "temperature": 0.7,
+        "max_completion_tokens": 8192,
+        "top_p": 1,
+        "stream": False,
+    }
+
+    try:
+        completion = await client.chat.completions.create(**kwargs)
+        summary = completion.choices[0].message.content.strip()
+
+        if not summary:
+            log_error(request_type='summary', chat_id=chat_id, error='empty_response')
+            return "❌ Не удалось сгенерировать саммари. Попробуйте позже."
+
+        # Формируем заголовок
+        header = f"🤓 Я проанализировал {total_count} сообщений.\nВот что вы пропустили:\n\n"
+        return header + summary
+
+    except Exception as e:
+        log_error(request_type='summary', chat_id=chat_id, error=e)
+        return "❌ Ошибка при генерации саммари"
