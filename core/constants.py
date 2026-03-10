@@ -1,5 +1,8 @@
 DEFAULT_LLM = "openai/gpt-oss-120b"
 
+# Количество сообщений для хранения и анализа
+MESSAGE_HISTORY_LIMIT = 50
+
 # Модель для генерации саммари (с большим контекстным окном)
 SUMMARY_MODEL = "llama-3.1-8b-instant"
 

@@ -14,7 +14,7 @@ summary_router = Router()
 async def summary_handler(message: Message, bot: Bot):
     """
     Обработчик команды /summary.
-    Получает последние 50 сообщений из чата и генерирует саммари.
+    Получает последние сообщения из чата и генерирует саммари.
     """
     chat_id = message.chat.id
 
@@ -26,7 +26,7 @@ async def summary_handler(message: Message, bot: Bot):
     status_msg = await message.reply("⏳ Анализирую историю чата...")
 
     try:
-        messages = await get_last_messages(chat_id, limit=50)
+        messages = await get_last_messages(chat_id)
 
         if len(messages) < 2:
             await status_msg.delete()

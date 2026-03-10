@@ -6,7 +6,7 @@ import asyncpg
 from asyncpg.pool import Pool
 
 from core.config import DATABASE_URL
-from core.constants import LLM_MODELS, DEFAULT_LLM
+from core.constants import LLM_MODELS, DEFAULT_LLM, MESSAGE_HISTORY_LIMIT
 from utils.logging_utils import logger
 
 pool: Pool
@@ -223,7 +223,7 @@ async def save_message(
 
 async def get_last_messages(
     chat_id: int,
-    limit: int = 50
+    limit: int = MESSAGE_HISTORY_LIMIT
 ) -> List[MessageRecord]:
     """Получить последние N сообщений из чата"""
     async with pool.acquire() as conn:
@@ -250,7 +250,7 @@ async def get_last_messages(
 
 async def cleanup_old_messages(
     chat_id: int,
-    keep_last: int = 50
+    keep_last: int = MESSAGE_HISTORY_LIMIT
 ) -> int:
     """Удалить старые сообщения, оставив только последние N"""
     async with pool.acquire() as conn:
@@ -269,7 +269,7 @@ async def cleanup_old_messages(
         return deleted
 
 
-async def cleanup_all_chats(keep_last: int = 50) -> dict:
+async def cleanup_all_chats(keep_last: int = MESSAGE_HISTORY_LIMIT) -> dict:
     """Очистить все чаты, оставив последние N сообщений в каждом"""
     async with pool.acquire() as conn:
         chat_ids = await conn.fetch("SELECT DISTINCT chat_id FROM message_history")
