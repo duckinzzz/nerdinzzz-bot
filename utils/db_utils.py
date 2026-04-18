@@ -1,6 +1,6 @@
-from typing import Dict, List, Optional
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Dict, List, Optional
 
 import asyncpg
 from asyncpg.pool import Pool
@@ -40,25 +40,48 @@ async def init_db() -> None:
 
     async with pool.acquire() as conn:
         await conn.execute("""
-            CREATE TABLE IF NOT EXISTS llm_models (
-                id SERIAL PRIMARY KEY,
-                code TEXT UNIQUE NOT NULL,
-                name TEXT NOT NULL
-            );
-        """)
+                           CREATE TABLE IF NOT EXISTS llm_models
+                           (
+                               id
+                               SERIAL
+                               PRIMARY
+                               KEY,
+                               code
+                               TEXT
+                               UNIQUE
+                               NOT
+                               NULL,
+                               name
+                               TEXT
+                               NOT
+                               NULL
+                           );
+                           """)
 
         await conn.execute("""
-            CREATE TABLE IF NOT EXISTS chat_settings (
-                chat_id BIGINT PRIMARY KEY,
-                llm_id INTEGER NOT NULL REFERENCES llm_models(id) ON DELETE RESTRICT
-            );
-        """)
+                           CREATE TABLE IF NOT EXISTS chat_settings
+                           (
+                               chat_id
+                               BIGINT
+                               PRIMARY
+                               KEY,
+                               llm_id
+                               INTEGER
+                               NOT
+                               NULL
+                               REFERENCES
+                               llm_models
+                           (
+                               id
+                           ) ON DELETE RESTRICT
+                               );
+                           """)
 
         # Индекс для быстрого поиска по llm_id (если понадобится аналитика)
         await conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_chat_settings_llm_id
-            ON chat_settings(llm_id);
-        """)
+                           CREATE INDEX IF NOT EXISTS idx_chat_settings_llm_id
+                               ON chat_settings(llm_id);
+                           """)
 
     await init_message_history_table()
     await seed_llm_models()
@@ -74,11 +97,11 @@ async def seed_llm_models() -> None:
     async with pool.acquire() as conn:
         for code, data in LLM_MODELS.items():
             await conn.execute("""
-                INSERT INTO llm_models (code, name)
-                VALUES ($1, $2)
-                ON CONFLICT (code) DO UPDATE
-                SET name = EXCLUDED.name
-            """, code, data["name"])
+                               INSERT INTO llm_models (code, name)
+                               VALUES ($1, $2) ON CONFLICT (code) DO
+                               UPDATE
+                                   SET name = EXCLUDED.name
+                               """, code, data["name"])
 
 
 async def load_chat_settings() -> None:
@@ -90,10 +113,10 @@ async def load_chat_settings() -> None:
 
     async with pool.acquire() as conn:
         rows = await conn.fetch("""
-            SELECT cs.chat_id, lm.code
-            FROM chat_settings cs
-            JOIN llm_models lm ON cs.llm_id = lm.id
-        """)
+                                SELECT cs.chat_id, lm.code
+                                FROM chat_settings cs
+                                         JOIN llm_models lm ON cs.llm_id = lm.id
+                                """)
 
     for row in rows:
         chat_settings_cache[row["chat_id"]] = row["code"]
@@ -112,17 +135,17 @@ async def get_chat_llm(chat_id: int) -> str:
     # Cache miss: fetch default model from DB
     async with pool.acquire() as conn:
         row = await conn.fetchrow("""
-            SELECT id, code
-            FROM llm_models
-            WHERE code = $1
-        """, DEFAULT_LLM)
+                                  SELECT id, code
+                                  FROM llm_models
+                                  WHERE code = $1
+                                  """, DEFAULT_LLM)
 
         if row is None:
             row = await conn.fetchrow("""
-                SELECT id, code
-                FROM llm_models
-                ORDER BY id LIMIT 1
-            """)
+                                      SELECT id, code
+                                      FROM llm_models
+                                      ORDER BY id LIMIT 1
+                                      """)
 
             if row is None:
                 raise RuntimeError("No LLM models available in database")
@@ -142,10 +165,10 @@ async def set_chat_llm(chat_id: int, llm_code: str) -> None:
     """
     async with pool.acquire() as conn:
         row = await conn.fetchrow("""
-            SELECT id
-            FROM llm_models
-            WHERE code = $1
-        """, llm_code)
+                                  SELECT id
+                                  FROM llm_models
+                                  WHERE code = $1
+                                  """, llm_code)
 
         if row is None:
             raise ValueError(f"Unknown LLM code: {llm_code}")
@@ -153,87 +176,91 @@ async def set_chat_llm(chat_id: int, llm_code: str) -> None:
         llm_id = row["id"]
 
         await conn.execute("""
-            INSERT INTO chat_settings (chat_id, llm_id)
-            VALUES ($1, $2)
-            ON CONFLICT (chat_id) DO UPDATE
-            SET llm_id = EXCLUDED.llm_id
-        """, chat_id, llm_id)
+                           INSERT INTO chat_settings (chat_id, llm_id)
+                           VALUES ($1, $2) ON CONFLICT (chat_id) DO
+                           UPDATE
+                               SET llm_id = EXCLUDED.llm_id
+                           """, chat_id, llm_id)
 
     chat_settings_cache[chat_id] = llm_code
-
-
-async def get_llm_id_by_code(code: str) -> Optional[int]:
-    """
-    Helper function.
-    Returns llm_id for a given llm code.
-    """
-    async with pool.acquire() as conn:
-        row = await conn.fetchrow("""
-            SELECT id
-            FROM llm_models
-            WHERE code = $1
-        """, code)
-
-    return row["id"] if row else None
 
 
 async def init_message_history_table() -> None:
     """Создать таблицу для истории сообщений"""
     async with pool.acquire() as conn:
         await conn.execute("""
-            CREATE TABLE IF NOT EXISTS message_history (
-                id SERIAL PRIMARY KEY,
-                chat_id BIGINT NOT NULL,
-                message_id BIGINT NOT NULL,
-                user_id BIGINT NOT NULL,
-                username TEXT,
-                text TEXT NOT NULL,
-                timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-            );
-        """)
+                           CREATE TABLE IF NOT EXISTS message_history
+                           (
+                               id
+                               SERIAL
+                               PRIMARY
+                               KEY,
+                               chat_id
+                               BIGINT
+                               NOT
+                               NULL,
+                               message_id
+                               BIGINT
+                               NOT
+                               NULL,
+                               user_id
+                               BIGINT
+                               NOT
+                               NULL,
+                               username
+                               TEXT,
+                               text
+                               TEXT
+                               NOT
+                               NULL,
+                               timestamp
+                               TIMESTAMPTZ
+                               DEFAULT
+                               CURRENT_TIMESTAMP
+                           );
+                           """)
 
         # UNIQUE индекс для защиты от дубликатов
         await conn.execute("""
-            CREATE UNIQUE INDEX IF NOT EXISTS uq_message_history_chat_message
-            ON message_history(chat_id, message_id);
-        """)
+                           CREATE UNIQUE INDEX IF NOT EXISTS uq_message_history_chat_message
+                               ON message_history(chat_id, message_id);
+                           """)
 
         # Индекс для быстрого поиска по чату
         await conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_message_history_chat_timestamp
-            ON message_history(chat_id, timestamp DESC);
-        """)
+                           CREATE INDEX IF NOT EXISTS idx_message_history_chat_timestamp
+                               ON message_history(chat_id, timestamp DESC);
+                           """)
 
 
 async def save_message(
-    chat_id: int,
-    message_id: int,
-    user_id: int,
-    username: Optional[str],
-    text: str
+        chat_id: int,
+        message_id: int,
+        user_id: int,
+        username: Optional[str],
+        text: str
 ) -> None:
     """Сохранить сообщение в БД (с защитой от дубликатов)"""
     async with pool.acquire() as conn:
         await conn.execute("""
-            INSERT INTO message_history (chat_id, message_id, user_id, username, text)
-            VALUES ($1, $2, $3, $4, $5)
-            ON CONFLICT (chat_id, message_id) DO NOTHING
-        """, chat_id, message_id, user_id, username, text)
+                           INSERT INTO message_history (chat_id, message_id, user_id, username, text)
+                           VALUES ($1, $2, $3, $4, $5) ON CONFLICT (chat_id, message_id) DO NOTHING
+                           """, chat_id, message_id, user_id, username, text)
 
 
 async def get_last_messages(
-    chat_id: int,
-    limit: int = MESSAGE_HISTORY_LIMIT
+        chat_id: int,
+        limit: int = MESSAGE_HISTORY_LIMIT
 ) -> List[MessageRecord]:
     """Получить последние N сообщений из чата"""
     async with pool.acquire() as conn:
         rows = await conn.fetch("""
-            SELECT message_id, user_id, username, text, timestamp
-            FROM message_history
-            WHERE chat_id = $1
-            ORDER BY timestamp DESC, id DESC
-            LIMIT $2
-        """, chat_id, limit)
+                                SELECT message_id, user_id, username, text, timestamp
+                                FROM message_history
+                                WHERE chat_id = $1
+                                ORDER BY timestamp DESC, id DESC
+                                    LIMIT $2
+                                """, chat_id, limit)
 
         # Возвращаем в хронологическом порядке
         return [
@@ -249,21 +276,24 @@ async def get_last_messages(
 
 
 async def cleanup_old_messages(
-    chat_id: int,
-    keep_last: int = MESSAGE_HISTORY_LIMIT
+        chat_id: int,
+        keep_last: int = MESSAGE_HISTORY_LIMIT
 ) -> int:
     """Удалить старые сообщения, оставив только последние N"""
     async with pool.acquire() as conn:
         result = await conn.execute("""
-            DELETE FROM message_history
-            WHERE chat_id = $1
-            AND id NOT IN (
-                SELECT id FROM message_history
-                WHERE chat_id = $1
-                ORDER BY timestamp DESC, id DESC
-                LIMIT $2
-            )
-        """, chat_id, keep_last)
+                                    DELETE
+                                    FROM message_history
+                                    WHERE chat_id = $1
+                                      AND id NOT IN (SELECT id
+                                                     FROM message_history
+                                                     WHERE chat_id = $1
+                                                     ORDER BY
+                                        timestamp DESC
+                                        , id DESC
+                                        LIMIT $2
+                                        )
+                                    """, chat_id, keep_last)
 
         deleted = int(result.split()[-1]) if result else 0
         return deleted

@@ -1,19 +1,15 @@
 import asyncio
-from collections import defaultdict
-from typing import Optional
 
 from aiogram import F, Router
 from aiogram.types import Message, PhotoSize
 
 from core.config import BOT_USERNAME
-from core.constants import LLM_MODELS
-from utils.db_utils import get_chat_llm
 from utils.llm_utils import get_ocr_response
 from utils.logging_utils import log_message
 
 photo_router = Router()
 
-album_buffer: dict[str, Optional[list[Message]]] = defaultdict(list)
+album_buffer: dict[str, list[Message]] = {}
 
 MAX_IMAGES_PER_REQUEST = 5
 MAX_BASE64_MB = 4
@@ -48,22 +44,6 @@ async def send_response(message: Message, text: str) -> None:
         await message.reply(text, parse_mode="Markdown")
     else:
         await message.answer(text, parse_mode="Markdown")
-
-
-async def check_multimodal_support(chat_id: int, message: Message) -> Optional[str]:
-    llm_code = await get_chat_llm(chat_id)
-    is_multimodal = LLM_MODELS.get(llm_code, {}).get("multimodal", False)
-
-    if not is_multimodal:
-        await send_response(
-            message,
-            "❌ Текущая модель не обрабатывает изображения, выберите другую:\n"
-            "`/set_llm meta-llama/llama-4-maverick-17b-128e-instruct`\n"
-            "`/set_llm meta-llama/llama-4-scout-17b-16e-instruct`"
-        )
-        return None
-
-    return llm_code
 
 
 async def process_single_photo(message: Message, llm_code: str) -> None:
@@ -129,35 +109,32 @@ async def handle_photo(message: Message):
     is_group = message.chat.type in ("group", "supergroup")
     caption = message.caption or ""
 
+    # Для групповых чатов проверяем упоминание бота
     if is_group:
-        if not media_id:
-            if not caption.startswith(f"@{BOT_USERNAME}"):
+        if not caption.startswith(f"@{BOT_USERNAME}"):
+            # Для альбомов проверяем, был ли уже добавлен media_id (если предыдущее фото имело упоминание)
+            if not media_id or media_id not in album_buffer:
                 return
-        else:
-            if media_id not in album_buffer:
-                if caption.startswith(f"@{BOT_USERNAME}"):
-                    album_buffer[media_id] = []
-                else:
-                    album_buffer[media_id] = None
-                    return
+        # Если есть упоминание и media_id отсутствует в буфере, инициализируем список
+        if media_id and media_id not in album_buffer:
+            album_buffer[media_id] = []
+    # Для приватных чатов всегда инициализируем буфер для альбомов
+    else:
+        if media_id and media_id not in album_buffer:
+            album_buffer[media_id] = []
 
-            if album_buffer[media_id] is None:
-                return
-
-    # Пока нет истории сообщений, изображения будут обрабатываться этой моделью
     llm_code = "meta-llama/llama-4-scout-17b-16e-instruct"
-    # chat_id = message.chat.id
-    # llm_code = await check_multimodal_support(chat_id, message)
-    if not llm_code:
-        return
 
+    # Одиночное фото
     if not media_id:
         await process_single_photo(message, llm_code)
         return
 
+    # Альбом: добавляем сообщение в буфер
     album_buffer[media_id].append(message)
     await asyncio.sleep(0.5)
 
+    # Извлекаем накопленные сообщения (если это последнее фото альбома)
     messages = album_buffer.pop(media_id, None)
     if not messages:
         return

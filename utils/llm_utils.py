@@ -1,5 +1,4 @@
 import base64
-import re
 import tempfile
 
 from aiogram import types
@@ -11,20 +10,6 @@ from core.constants import LLM_MODELS
 from utils.logging_utils import log_error
 
 client = AsyncGroq(api_key=LLM_TOKEN)
-
-
-def remove_reasoning_tags(text: str) -> str:
-    """
-    Удаляет reasoning теги из ответа модели.
-    Reasoning обычно обернут в <think>...</think> или <reasoning>...</reasoning>
-    """
-    # Удаляем <think>...</think>
-    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
-    # Удаляем <reasoning>...</reasoning>
-    text = re.sub(r'<reasoning>.*?</reasoning>', '', text, flags=re.DOTALL)
-    # Удаляем лишние пробелы и переносы строк
-    text = re.sub(r'\n\n+', '\n\n', text)
-    return text.strip()
 
 
 def encode_image(image_path: str) -> str:

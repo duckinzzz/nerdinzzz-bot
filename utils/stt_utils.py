@@ -2,6 +2,7 @@ import tempfile
 
 import ffmpeg
 import imageio_ffmpeg as iio
+import unicodedata
 from groq import Groq
 
 from core.config import STT_TOKEN
@@ -9,8 +10,6 @@ from core.constants import HALLUCINATIONS
 from utils.logging_utils import log_event
 
 client = Groq(api_key=STT_TOKEN)
-
-import unicodedata
 
 
 def process_transcription(result):
