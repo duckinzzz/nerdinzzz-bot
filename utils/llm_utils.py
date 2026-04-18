@@ -181,7 +181,7 @@ async def get_llm_response(user_prompt: str, llm_code: str) -> str:
 
 
 async def make_prompt(user_prompt: str) -> str:
-    llm_code = 'moonshotai/kimi-k2-instruct-0905'
+    llm_code = 'openai/gpt-oss-120b'
 
     system_prompt = f"""
         Rewrite user input into image generation prompt.

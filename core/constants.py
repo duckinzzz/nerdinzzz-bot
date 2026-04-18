@@ -4,7 +4,7 @@ DEFAULT_LLM = "openai/gpt-oss-120b"
 MESSAGE_HISTORY_LIMIT = 50
 
 # Модель для генерации саммари (с большим контекстным окном)
-SUMMARY_MODEL = "llama-3.1-8b-instant"
+SUMMARY_MODEL = "llama-3.3-70b-versatile"
 
 # Промпт для генерации саммари
 SUMMARY_PROMPT = """
@@ -67,11 +67,6 @@ LLM_MODELS = {
     "qwen/qwen3-32b": {
         "name": "Qwen3 32B",
         "reasoning": True,
-        "multimodal": False,
-    },
-    "moonshotai/kimi-k2-instruct-0905": {
-        "name": "Kimi K2 0905",
-        "reasoning": False,
         "multimodal": False,
     },
 }
