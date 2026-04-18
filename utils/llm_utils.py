@@ -2,7 +2,7 @@ import base64
 import tempfile
 
 from aiogram import types
-from groq import AsyncGroq
+from groq import AsyncGroq, APIStatusError
 
 from core.app import bot
 from core.config import LLM_TOKEN
@@ -98,6 +98,12 @@ async def get_ocr_response(caption: str, photos: list[types.PhotoSize], llm_code
 
         return content.strip()
 
+    except APIStatusError as e:
+        if e.status_code == 413:
+            log_error(request_type='process_image', caption=caption, error=e)
+            return "❌ Сообщение слишком длинное, попробуйте сменить модель, или укоротить сообщение"
+        log_error(request_type='process_image', caption=caption, error=e)
+        return f"❌ Ошибка при обработке изображения"
     except Exception as e:
         log_error(request_type='process_image', caption=caption, error=e)
         return f"❌ Ошибка при обработке изображения"
@@ -160,6 +166,12 @@ async def get_llm_response(user_prompt: str, llm_code: str) -> str:
 
         return content.strip()
 
+    except APIStatusError as e:
+        if e.status_code == 413:
+            log_error(request_type='llm_question', user_prompt=user_prompt, error=e)
+            return "❌ Сообщение слишком длинное, попробуйте сменить модель, или укоротить сообщение"
+        log_error(request_type='llm_question', user_prompt=user_prompt, error=e)
+        return f"❌ Ошибка при обработке запроса"
     except Exception as e:
         log_error(request_type='llm_question', user_prompt=user_prompt, error=e)
         return f"❌ Ошибка при обработке запроса"
@@ -206,6 +218,12 @@ async def make_prompt(user_prompt: str) -> str:
             return ''
         return prompt
 
+    except APIStatusError as e:
+        if e.status_code == 413:
+            log_error(request_type='image_generation', user_prompt=user_prompt, error=e)
+            # Возвращаем пустую строку, вызывающий код должен обработать ошибку
+        log_error(request_type='image_generation', user_prompt=user_prompt, error=e)
+        return ''
     except Exception as e:
         log_error(request_type='image_generation', user_prompt=user_prompt, error=e)
         return ''
@@ -278,6 +296,12 @@ async def generate_summary(messages_json: list[dict], chat_id: int, total_count:
         header = f"🤓 Я проанализировал {total_count} сообщений.\nВот что вы пропустили:\n\n"
         return header + summary
 
+    except APIStatusError as e:
+        if e.status_code == 413:
+            log_error(request_type='summary', chat_id=chat_id, error=e)
+            return "❌ Сообщение слишком длинное, попробуйте сменить модель, или укоротить сообщение"
+        log_error(request_type='summary', chat_id=chat_id, error=e)
+        return f"❌ Ошибка при генерации саммари"
     except Exception as e:
         log_error(request_type='summary', chat_id=chat_id, error=e)
         return "❌ Ошибка при генерации саммари"
