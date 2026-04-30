@@ -87,7 +87,7 @@ HALLUCINATIONS = {
     'hello everyone',
 }
 
-REACTION_PROB = 0.005
+REACTION_PROB = 0.0025
 EMOJIS_RANDOM_POOL = ["👌", "🥱", "😈", "🤯", "🕊", "🖕"]
 EMOJIS_WEIGHTS = [50, 25, 15, 7, 3, 1]
 EMOJIS_SUPPORTED = ["❤", "👍", "👎", "🔥", "🥰", "👏", "😁", "🤔", "🤯", "😱", "🤬", "😢",

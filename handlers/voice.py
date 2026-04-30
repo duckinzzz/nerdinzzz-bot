@@ -1,7 +1,7 @@
 import tempfile
 
 from aiogram import F, Router
-from aiogram.types import Message
+from aiogram.types import Message, reaction_type_emoji
 
 from core.app import bot
 from utils import stt_utils
@@ -18,8 +18,12 @@ async def voice_handler(message: Message):
     with tempfile.NamedTemporaryFile(suffix=".ogg") as tmp:
         await bot.download_file(file.file_path, destination=tmp.name)
         stt_response = await stt_utils.stt(tmp.name)
-        log_message(request_type='stt_request', message=message, stt_response=stt_response)
-        await message.reply(stt_response)
+        if stt_response:
+            log_message(request_type='stt_request', message=message, stt_response=stt_response)
+            await message.reply(stt_response)
+        else:
+            log_message(request_type='stt_request', message=message, stt_response='')
+            await message.react([reaction_type_emoji.ReactionTypeEmoji(emoji="🙊")])
 
 
 @voice_router.message(F.content_type == "video_note")
@@ -30,5 +34,9 @@ async def video_note_handler(message: Message):
     with tempfile.NamedTemporaryFile(suffix=".mp4") as tmp:
         await bot.download_file(file.file_path, destination=tmp.name)
         stt_response = await stt_utils.stt_from_video(tmp.name)
-        log_message(request_type='stt_request', message=message, stt_response=stt_response)
-        await message.reply(stt_response)
+        if stt_response:
+            log_message(request_type='stt_request', message=message, stt_response=stt_response)
+            await message.reply(stt_response)
+        else:
+            log_message(request_type='stt_request', message=message, stt_response='')
+            await message.react([reaction_type_emoji.ReactionTypeEmoji(emoji="🙊")])

@@ -14,16 +14,16 @@ client = Groq(api_key=STT_TOKEN)
 
 def process_transcription(result):
     if not result.segments:
-        return '[тишина]'
+        return None
 
     avg_logprob = sum(s['avg_logprob'] for s in result.segments) / len(result.segments)
 
     norm_text = unicodedata.normalize("NFKC", result.text).casefold().strip('.!?, ')
     if not norm_text:
-        return '[тишина]'
+        return None
 
     if norm_text in HALLUCINATIONS or avg_logprob < -1.0:
-        return '[тишина]'
+        return None
 
     return result.text
 
