@@ -23,7 +23,7 @@ async def voice_handler(message: Message):
             await message.reply(stt_response)
         else:
             log_message(request_type='stt_request', message=message, stt_response='')
-            await message.react([reaction_type_emoji.ReactionTypeEmoji(emoji="🙊")])
+            await message.react([reaction_type_emoji.ReactionTypeEmoji(emoji="🙉")])
 
 
 @voice_router.message(F.content_type == "video_note")
@@ -39,4 +39,4 @@ async def video_note_handler(message: Message):
             await message.reply(stt_response)
         else:
             log_message(request_type='stt_request', message=message, stt_response='')
-            await message.react([reaction_type_emoji.ReactionTypeEmoji(emoji="🙊")])
+            await message.react([reaction_type_emoji.ReactionTypeEmoji(emoji="🙉")])

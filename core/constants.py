@@ -82,9 +82,12 @@ HALLUCINATIONS = {
     'thank you for watching',
     'preparation for cooking',
     'you',
-    'субтитры сделал dimatorzok',
     'продолжение следует',
     'hello everyone',
+}
+
+HALLUCINATIONS_WORDS = {
+    'dimatorzok'
 }
 
 REACTION_PROB = 0.0025

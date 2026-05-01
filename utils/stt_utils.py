@@ -6,7 +6,7 @@ import unicodedata
 from groq import Groq
 
 from core.config import STT_TOKEN
-from core.constants import HALLUCINATIONS
+from core.constants import HALLUCINATIONS, HALLUCINATIONS_WORDS
 from utils.logging_utils import log_event
 
 client = Groq(api_key=STT_TOKEN)
@@ -23,6 +23,9 @@ def process_transcription(result):
         return None
 
     if norm_text in HALLUCINATIONS or avg_logprob < -1.0:
+        return None
+
+    if any([h in norm_text for h in HALLUCINATIONS_WORDS]):
         return None
 
     return result.text
