@@ -84,6 +84,7 @@ HALLUCINATIONS = {
     'you',
     'продолжение следует',
     'hello everyone',
+    'takk for watching',
 }
 
 HALLUCINATIONS_WORDS = {
