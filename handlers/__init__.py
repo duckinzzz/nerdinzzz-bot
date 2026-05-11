@@ -1,6 +1,6 @@
 from aiogram import Router
 
-from core.middlewares import LuckyEmojiMiddleware, MessageHistoryMiddleware
+from core.middlewares import LuckyEmojiMiddleware, MessageHistoryMiddleware, BotStatsMiddleware
 from .admin import admin_router
 from .base import base_router
 from .photo import photo_router
@@ -14,6 +14,7 @@ def get_main_router() -> Router:
 
     main_router.message.outer_middleware(MessageHistoryMiddleware())
     main_router.message.outer_middleware(LuckyEmojiMiddleware())
+    main_router.message.outer_middleware(BotStatsMiddleware())
 
     main_router.include_router(base_router)
     main_router.include_router(admin_router)
