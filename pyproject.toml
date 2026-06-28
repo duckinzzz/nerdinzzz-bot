@@ -10,6 +10,7 @@ dependencies = [
     "ffmpeg-python>=0.2.0",
     "groq>=1.1.1",
     "imageio-ffmpeg>=0.6.0",
+    "mcp>=1.6.0",
     "protobuf>=7.34.0",
     "python-dotenv==1.2.1",
     "telegramify-markdown==1.0.0rc4",

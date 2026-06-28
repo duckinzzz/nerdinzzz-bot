@@ -9,6 +9,7 @@ from handlers import get_main_router
 from utils import db_utils
 from utils.logging_utils import logger
 from utils.scheduler import run_daily_cleanup
+from utils.weather_utils import stop_mcp
 
 
 async def on_startup(_: Application) -> None:
@@ -23,6 +24,7 @@ async def on_shutdown(_: Application) -> None:
     await bot.delete_webhook()
     await bot.session.close()
     await db_utils.close_db()
+    await stop_mcp()
     logger.info(f"[{ENV}] Webhook removed, bot shutdown")
 
 
@@ -50,6 +52,7 @@ async def main_polling():
     finally:
         await db_utils.close_db()
         await bot.session.close()
+        await stop_mcp()
         logger.info(f"[{ENV}] Bot stopped, session closed.")
 
 
