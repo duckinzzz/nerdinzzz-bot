@@ -6,6 +6,9 @@ MESSAGE_HISTORY_LIMIT = 50
 # Модель для генерации саммари (с большим контекстным окном)
 SUMMARY_MODEL = "llama-3.3-70b-versatile"
 
+# Модель для OCR
+OCR_MODEL = "qwen/qwen3.6-27b"
+
 # Промпт для генерации саммари
 SUMMARY_PROMPT = """
 Ты — ассистент для создания кратких саммари переписки в чате.
@@ -59,15 +62,10 @@ LLM_MODELS = {
         "reasoning": True,
         "multimodal": False,
     },
-    "meta-llama/llama-4-scout-17b-16e-instruct": {
-        "name": "Llama 4 Scout 17B 16E",
-        "reasoning": False,
-        "multimodal": True,
-    },
-    "qwen/qwen3-32b": {
-        "name": "Qwen3 32B",
+    "qwen/qwen3.6-27b": {
+        "name": "Qwen 3.6",
         "reasoning": True,
-        "multimodal": False,
+        "multimodal": True,
     },
 }
 

@@ -4,6 +4,7 @@ from aiogram import F, Router
 from aiogram.types import Message, PhotoSize
 
 from core.config import BOT_USERNAME
+from core.constants import OCR_MODEL
 from utils.llm_utils import get_ocr_response
 from utils.logging_utils import log_message
 
@@ -123,7 +124,7 @@ async def handle_photo(message: Message):
         if media_id and media_id not in album_buffer:
             album_buffer[media_id] = []
 
-    llm_code = "meta-llama/llama-4-scout-17b-16e-instruct"
+    llm_code = OCR_MODEL
 
     # Одиночное фото
     if not media_id:
