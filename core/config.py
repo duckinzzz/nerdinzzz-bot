@@ -18,10 +18,6 @@ CF_ACCOUNT_ID = os.getenv("CF_ACCOUNT_ID")
 CF_API_TOKEN = os.getenv("CF_API_TOKEN")
 BOTSTATS_API_TOKEN = os.getenv("BOTSTATS_API_TOKEN")
 
-# MCP weather server (https://github.com/weather-mcp/weather-mcp)
-MCP_WEATHER_COMMAND = os.getenv("MCP_WEATHER_COMMAND", "weather-mcp")
-MCP_WEATHER_ARGS = os.getenv("MCP_WEATHER_ARGS", "").split()
-
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN not found")
 if not LLM_TOKEN:

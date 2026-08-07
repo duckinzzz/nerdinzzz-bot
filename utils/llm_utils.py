@@ -9,7 +9,8 @@ from openai import AsyncOpenAI, APIStatusError
 from core.app import bot
 from core.config import LLM_TOKEN, STT_TOKEN
 from core.constants import LLM_MODEL
-from utils.logging_utils import log_error
+from utils.logging_utils import log_error, log_event
+from utils.tools import get_tool_registry
 
 # DeepSeek — text generation
 client = AsyncOpenAI(
@@ -119,15 +120,16 @@ async def get_llm_response(user_prompt: str) -> str:
     - Не объясняй свои действия и не добавляй приветствия или прощания.
     - Всегда придерживайся нейтрального и дружелюбного тона.
     - Не экранируй символы, кавычки или специальные знаки — выводи текст «как есть».
+    - Если нужны актуальные данные (погода, курсы валют и т.д.) — используй доступные инструменты.
     """
 
-    messages = [
-        {
-            "role": "system",
-            "content": system_prompt.lower()
-        },
-        {"role": "user", "content": user_prompt}
+    messages: list[dict] = [
+        {"role": "system", "content": system_prompt.lower()},
+        {"role": "user", "content": user_prompt},
     ]
+
+    registry = get_tool_registry()
+    tools = registry.get_openai_definitions() if registry.has_tools() else None
 
     kwargs: dict = {
         "model": LLM_MODEL,
@@ -138,16 +140,52 @@ async def get_llm_response(user_prompt: str) -> str:
         "stream": False,
         "stop": None,
     }
+    if tools:
+        kwargs["tools"] = tools
 
     try:
+        # First LLM call — may return tool_calls
         completion = await client.chat.completions.create(**kwargs)
-        content = completion.choices[0].message.content.strip()
+        msg = completion.choices[0].message
+
+        # Function calling loop (max 3 tool-call rounds to prevent infinite loops)
+        for _ in range(3):
+            if not msg.tool_calls:
+                break
+
+            # Execute tools
+            tool_results = await registry.execute(msg.tool_calls)
+            log_event(
+                event="tool_calls",
+                tools=[tc.function.name for tc in msg.tool_calls],
+            )
+
+            # Append assistant message + tool results to history
+            messages.append({
+                "role": "assistant",
+                "content": msg.content or "",
+                "tool_calls": [
+                    {"id": tc.id, "type": "function", "function": {
+                        "name": tc.function.name,
+                        "arguments": tc.function.arguments,
+                    }}
+                    for tc in msg.tool_calls
+                ],
+            })
+            messages.extend(tool_results)
+
+            # Second LLM call — with tool results
+            kwargs["messages"] = messages
+            completion = await client.chat.completions.create(**kwargs)
+            msg = completion.choices[0].message
+
+        content = (msg.content or "").strip()
 
         if not content:
             log_error(request_type='llm_question', user_prompt=user_prompt, error='empty_response')
             return "❌ Модель не смогла ответить на ваш вопрос. Попробуйте переформулировать вопрос."
 
-        return content.strip()
+        return content
 
     except APIStatusError as e:
         if e.status_code == 413:

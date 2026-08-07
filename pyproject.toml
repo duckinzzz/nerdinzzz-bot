@@ -11,7 +11,6 @@ dependencies = [
     "groq>=1.5.0",
     "openai>=1.0.0",
     "imageio-ffmpeg>=0.6.0",
-    "mcp>=1.6.0",
     "protobuf>=7.34.0",
     "python-dotenv==1.2.1",
     "telegramify-markdown==1.0.0rc4",

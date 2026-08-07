@@ -5,7 +5,7 @@ from telegramify_markdown import convert
 
 from core.config import BOT_USERNAME
 from core.app import bot
-from utils import llm_utils, tti_utils, tts_utils, weather_utils
+from utils import llm_utils, tti_utils, tts_utils
 from utils.logging_utils import log_message, log_error
 
 text_router = Router()
@@ -89,16 +89,8 @@ async def process_text_request(message: Message, text: str) -> None:
         return
 
     # Обычный LLM запрос
-    # Если запрос о погоде - подгружаем данные через MCP weather server
-    weather_context = ""
-    if weather_utils.is_weather_query(text):
-        weather_data = await weather_utils.get_weather_for_query(text)
-        if weather_data:
-            weather_context = "\n\n[Данные о погоде: " + weather_data + "]"
-            log_message(request_type='weather_fetch', message=message, weather_info=weather_data)
-
     await bot.send_chat_action(chat_id=chat_id, action="typing")
-    llm_response = await llm_utils.get_llm_response(text + weather_context)
+    llm_response = await llm_utils.get_llm_response(text)
     text, entities = convert(llm_response)
     log_message(request_type='llm_question', message=message, llm_response=llm_response)
     await send_response(text, entities=[e.to_dict() for e in entities])

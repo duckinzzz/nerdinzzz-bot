@@ -9,11 +9,12 @@ from handlers import get_main_router
 from utils import db_utils
 from utils.logging_utils import logger
 from utils.scheduler import run_daily_cleanup
-from utils.weather_utils import stop_mcp
+from utils.tools import init_tools
 
 
 async def on_startup(_: Application) -> None:
     await db_utils.init_db()
+    init_tools()
     dp.include_router(get_main_router())
     asyncio.create_task(run_daily_cleanup(bot))
     await bot.set_webhook(url=WEBHOOK_URL, drop_pending_updates=True, allowed_updates=[])
@@ -24,7 +25,6 @@ async def on_shutdown(_: Application) -> None:
     await bot.delete_webhook()
     await bot.session.close()
     await db_utils.close_db()
-    await stop_mcp()
     logger.info(f"[{ENV}] Webhook removed, bot shutdown")
 
 
@@ -44,6 +44,7 @@ def main():
 async def main_polling():
     logger.info(f"[{ENV}] Starting bot in long-polling mode...")
     await db_utils.init_db()
+    init_tools()
     dp.include_router(get_main_router())
     asyncio.create_task(run_daily_cleanup(bot))
     await bot.delete_webhook(drop_pending_updates=True)
@@ -52,7 +53,6 @@ async def main_polling():
     finally:
         await db_utils.close_db()
         await bot.session.close()
-        await stop_mcp()
         logger.info(f"[{ENV}] Bot stopped, session closed.")
 
 
