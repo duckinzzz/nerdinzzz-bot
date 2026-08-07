@@ -2,14 +2,17 @@ import base64
 import tempfile
 
 from aiogram import types
-from groq import AsyncGroq, APIStatusError
+from openai import AsyncOpenAI, APIStatusError
 
 from core.app import bot
 from core.config import LLM_TOKEN
-from core.constants import LLM_MODELS
+from core.constants import LLM_MODEL
 from utils.logging_utils import log_error
 
-client = AsyncGroq(api_key=LLM_TOKEN)
+client = AsyncOpenAI(
+    api_key=LLM_TOKEN,
+    base_url="https://api.deepseek.com",
+)
 
 
 def encode_image(image_path: str) -> str:
@@ -19,7 +22,7 @@ def encode_image(image_path: str) -> str:
 
 async def download_photo_to_base64(bot, photo: types.PhotoSize) -> str:
     """
-    Скачивает фото из Telegram и возвращает base64 строку
+    Download photo from Telegram and return base64 string.
     """
     with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
         file = await bot.get_file(photo.file_id)
@@ -28,16 +31,13 @@ async def download_photo_to_base64(bot, photo: types.PhotoSize) -> str:
         return encode_image(tmp.name)
 
 
-async def get_ocr_response(caption: str, photos: list[types.PhotoSize], llm_code: str) -> str:
+async def get_ocr_response(caption: str, photos: list[types.PhotoSize]) -> str:
     """
-    caption: текстовое описание / подпись
-    photos: список объектов types.PhotoSize из Telegram
-    llm_code: ключ из LLM_MODELS
+    caption: text description / caption
+    photos: list of Telegram PhotoSize objects
     """
-    llm = LLM_MODELS[llm_code]
-
-    system_prompt = f"""
-    Ты — Nerdinzzz 🤓, LLM чат-бот на базе {llm['name']}.
+    system_prompt = """
+    Ты — Nerdinzzz 🤓, LLM чат-бот на базе DeepSeek V4.
     Твой создатель — @duckinzzz.
     Твоя задача:
     - Быстро и точно распознавать содержимое изображений.
@@ -51,7 +51,7 @@ async def get_ocr_response(caption: str, photos: list[types.PhotoSize], llm_code
     - Не экранируй символы, кавычки или специальные знаки — выводи текст «как есть».
     """
 
-    # Кодируем все фото в base64
+    # Encode all photos to base64
     encoded_photos = []
     for photo in photos:
         b64 = await download_photo_to_base64(bot, photo)
@@ -67,26 +67,15 @@ async def get_ocr_response(caption: str, photos: list[types.PhotoSize], llm_code
         {"role": "user", "content": user_content}
     ]
 
-    kwargs = {
-        "model": llm_code,
+    kwargs: dict = {
+        "model": LLM_MODEL,
         "messages": messages,
-        "temperature": 1,
-        "max_completion_tokens": 4096,  # Увеличено для reasoning моделей
+        "temperature": 0.7,
+        "max_completion_tokens": 4096,
         "top_p": 1,
         "stream": False,
         "stop": None,
     }
-
-    # Настройка reasoning для разных моделей
-    if llm.get('reasoning'):
-        # Для GPT-OSS моделей: используем low effort + показываем reasoning
-        if llm_code.startswith('openai/gpt-oss'):
-            kwargs["reasoning_effort"] = "low"  # минимальное рассуждение
-            # НЕ используем include_reasoning=False, т.к. это всё равно не отключает генерацию
-            # Вместо этого показываем reasoning пользователю
-        # Для Qwen моделей: можно полностью отключить
-        elif llm_code.startswith('qwen/'):
-            kwargs["reasoning_effort"] = "none"
 
     try:
         completion = await client.chat.completions.create(**kwargs)
@@ -101,19 +90,17 @@ async def get_ocr_response(caption: str, photos: list[types.PhotoSize], llm_code
     except APIStatusError as e:
         if e.status_code == 413:
             log_error(request_type='process_image', caption=caption, error=e)
-            return "❌ Сообщение слишком длинное, попробуйте сменить модель, или укоротить сообщение"
+            return "❌ Сообщение слишком длинное, попробуйте укоротить сообщение"
         log_error(request_type='process_image', caption=caption, error=e)
-        return f"❌ Ошибка при обработке изображения"
+        return "❌ Ошибка при обработке изображения"
     except Exception as e:
         log_error(request_type='process_image', caption=caption, error=e)
-        return f"❌ Ошибка при обработке изображения"
+        return "❌ Ошибка при обработке изображения"
 
 
-async def get_llm_response(user_prompt: str, llm_code: str) -> str:
-    llm = LLM_MODELS[llm_code]
-
-    system_prompt = f"""
-    Ты — Nerdinzzz 🤓, LLM чат-бот на базе {llm['name']}.
+async def get_llm_response(user_prompt: str) -> str:
+    system_prompt = """
+    Ты — Nerdinzzz 🤓, LLM чат-бот на базе DeepSeek V4.
     Твой создатель — @duckinzzz.
     Твоя задача:
     - Быстро и точно отвечать на текстовые сообщения.
@@ -135,26 +122,15 @@ async def get_llm_response(user_prompt: str, llm_code: str) -> str:
         {"role": "user", "content": user_prompt}
     ]
 
-    kwargs = {
-        "model": llm_code,
+    kwargs: dict = {
+        "model": LLM_MODEL,
         "messages": messages,
-        "temperature": 1,
-        "max_completion_tokens": 4096,  # Увеличено для reasoning моделей
+        "temperature": 0.7,
+        "max_completion_tokens": 4096,
         "top_p": 1,
         "stream": False,
         "stop": None,
     }
-
-    # Настройка reasoning для разных моделей
-    if llm.get('reasoning'):
-        # Для GPT-OSS моделей: используем low effort + показываем reasoning
-        if llm_code.startswith('openai/gpt-oss'):
-            kwargs["reasoning_effort"] = "low"  # минимальное рассуждение
-            # НЕ используем include_reasoning=False, т.к. это всё равно не отключает генерацию
-            # Вместо этого показываем reasoning пользователю
-        # Для Qwen моделей: можно полностью отключить
-        elif llm_code.startswith('qwen/'):
-            kwargs["reasoning_effort"] = "none"
 
     try:
         completion = await client.chat.completions.create(**kwargs)
@@ -162,27 +138,25 @@ async def get_llm_response(user_prompt: str, llm_code: str) -> str:
 
         if not content:
             log_error(request_type='llm_question', user_prompt=user_prompt, error='empty_response')
-            return "❌ Модель не смогла ответить на ваш вопрос. Попробуйте переформулировать вопрос или сменить модель."
+            return "❌ Модель не смогла ответить на ваш вопрос. Попробуйте переформулировать вопрос."
 
         return content.strip()
 
     except APIStatusError as e:
         if e.status_code == 413:
             log_error(request_type='llm_question', user_prompt=user_prompt, error=e)
-            return "❌ Сообщение слишком длинное, попробуйте сменить модель, или укоротить сообщение"
+            return "❌ Сообщение слишком длинное, попробуйте укоротить сообщение"
         log_error(request_type='llm_question', user_prompt=user_prompt, error=e)
-        return f"❌ Ошибка при обработке запроса"
+        return "❌ Ошибка при обработке запроса"
     except Exception as e:
         log_error(request_type='llm_question', user_prompt=user_prompt, error=e)
-        return f"❌ Ошибка при обработке запроса"
+        return "❌ Ошибка при обработке запроса"
 
 
 async def make_prompt(user_prompt: str) -> str:
-    llm_code = 'openai/gpt-oss-120b'
-
-    system_prompt = f"""
+    system_prompt = """
         Rewrite user input into image generation prompt.
-        No violence. More realistic style if not specified. 
+        No violence. More realistic style if not specified.
         Just transform user input to text-to-image prompt.
         Return only the prompt.
         ENGLISH ONLY
@@ -196,14 +170,14 @@ async def make_prompt(user_prompt: str) -> str:
         {"role": "user", "content": user_prompt}
     ]
 
-    kwargs = {
-        "model": llm_code,
+    kwargs: dict = {
+        "model": LLM_MODEL,
         "messages": messages,
         "temperature": 1,
         "max_completion_tokens": 4096,
         "top_p": 1,
         "stream": False,
-        "stop": None
+        "stop": None,
     }
 
     try:
@@ -213,7 +187,7 @@ async def make_prompt(user_prompt: str) -> str:
         if not prompt:
             log_error(request_type='image_generation', user_prompt=user_prompt, error="generated_empty_prompt")
             return ''
-        if 'I can’t help with'.lower() in prompt.lower():
+        if "i can't help with" in prompt.lower():
             log_error(request_type='image_generation', user_prompt=user_prompt, error="prompt_restricted")
             return ''
         return prompt
@@ -221,7 +195,6 @@ async def make_prompt(user_prompt: str) -> str:
     except APIStatusError as e:
         if e.status_code == 413:
             log_error(request_type='image_generation', user_prompt=user_prompt, error=e)
-            # Возвращаем пустую строку, вызывающий код должен обработать ошибку
         log_error(request_type='image_generation', user_prompt=user_prompt, error=e)
         return ''
     except Exception as e:
@@ -231,30 +204,30 @@ async def make_prompt(user_prompt: str) -> str:
 
 async def generate_summary(messages_json: list[dict], chat_id: int, total_count: int, bot_username: str) -> str:
     """
-    Генерирует саммари по сообщениям чата.
+    Generate a summary of chat messages.
 
-    messages_json: список словарей вида {username, text, message_id}
-    chat_id: ID чата
-    total_count: количество сообщений
-    bot_username: юзернейм бота (для фильтрации его ответов)
+    messages_json: list of dicts with {username, text, message_id}
+    chat_id: chat ID
+    total_count: number of messages
+    bot_username: bot's username (to filter out its own responses)
 
-    Возвращает саммари в формате:
+    Returns summary in format:
     🤓 AI проанализировал N сообщений.
     Вот что вы пропустили:
-    [Темы с описанием]
+    [Topics with descriptions]
     """
-    from core.constants import SUMMARY_MODEL, SUMMARY_PROMPT
+    from core.constants import SUMMARY_PROMPT
 
     system_prompt = SUMMARY_PROMPT
 
-    # Формируем контекст из сообщений, исключая ответы бота
+    # Build context from messages, excluding bot's own responses
     messages_text = []
     for msg in messages_json:
         username = msg.get('username') or f"user_{msg['user_id']}"
         if not username.startswith('@'):
             username = f"@{username}"
 
-        # Пропускаем сообщения от бота (но оставляем запросы к нему)
+        # Skip messages from the bot (but keep requests to it)
         if username.lower() == f"@{bot_username}".lower():
             continue
 
@@ -275,8 +248,8 @@ async def generate_summary(messages_json: list[dict], chat_id: int, total_count:
         {"role": "user", "content": user_prompt}
     ]
 
-    kwargs = {
-        "model": SUMMARY_MODEL,
+    kwargs: dict = {
+        "model": LLM_MODEL,
         "messages": messages,
         "temperature": 0.7,
         "max_completion_tokens": 8192,
@@ -292,16 +265,16 @@ async def generate_summary(messages_json: list[dict], chat_id: int, total_count:
             log_error(request_type='summary', chat_id=chat_id, error='empty_response')
             return "❌ Не удалось сгенерировать саммари. Попробуйте позже."
 
-        # Формируем заголовок
+        # Format header
         header = f"🤓 Я проанализировал {total_count} сообщений.\nВот что вы пропустили:\n\n"
         return header + summary
 
     except APIStatusError as e:
         if e.status_code == 413:
             log_error(request_type='summary', chat_id=chat_id, error=e)
-            return "❌ Сообщение слишком длинное, попробуйте сменить модель, или укоротить сообщение"
+            return "❌ Сообщение слишком длинное, попробуйте укоротить сообщение"
         log_error(request_type='summary', chat_id=chat_id, error=e)
-        return f"❌ Ошибка при генерации саммари"
+        return "❌ Ошибка при генерации саммари"
     except Exception as e:
         log_error(request_type='summary', chat_id=chat_id, error=e)
         return "❌ Ошибка при генерации саммари"

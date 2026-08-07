@@ -1,13 +1,7 @@
-DEFAULT_LLM = "openai/gpt-oss-120b"
+LLM_MODEL = "deepseek-v4-flash"
 
 # Количество сообщений для хранения и анализа
 MESSAGE_HISTORY_LIMIT = 50
-
-# Модель для генерации саммари (с большим контекстным окном)
-SUMMARY_MODEL = "llama-3.3-70b-versatile"
-
-# Модель для OCR
-OCR_MODEL = "qwen/qwen3.6-27b"
 
 # Промпт для генерации саммари
 SUMMARY_PROMPT = """
@@ -40,34 +34,6 @@ SUMMARY_PROMPT = """
 🔸 Обсуждение стикеров
 - @duckinzzz поделился ссылкой на пак стикеров
 """
-
-LLM_MODELS = {
-    "llama-3.1-8b-instant": {
-        "name": "Llama 3.1 8B",
-        "reasoning": False,
-        "multimodal": False,
-    },
-    "llama-3.3-70b-versatile": {
-        "name": "Llama 3.3 70B",
-        "reasoning": False,
-        "multimodal": False,
-    },
-    "openai/gpt-oss-120b": {
-        "name": "GPT OSS 120B",
-        "reasoning": True,
-        "multimodal": False,
-    },
-    "openai/gpt-oss-20b": {
-        "name": "GPT OSS 20B",
-        "reasoning": True,
-        "multimodal": False,
-    },
-    "qwen/qwen3.6-27b": {
-        "name": "Qwen 3.6",
-        "reasoning": True,
-        "multimodal": True,
-    },
-}
 
 SUPPORTED_MSG_TYPES = ["text",
                        "voice",

@@ -4,7 +4,6 @@ from aiogram import F, Router
 from aiogram.types import Message, PhotoSize
 
 from core.config import BOT_USERNAME
-from core.constants import OCR_MODEL
 from utils.llm_utils import get_ocr_response
 from utils.logging_utils import log_message
 
@@ -47,7 +46,7 @@ async def send_response(message: Message, text: str) -> None:
         await message.answer(text, parse_mode="Markdown")
 
 
-async def process_single_photo(message: Message, llm_code: str) -> None:
+async def process_single_photo(message: Message) -> None:
     try:
         photo = get_largest_photo(message)
         validate_photo_limits(photo)
@@ -57,18 +56,17 @@ async def process_single_photo(message: Message, llm_code: str) -> None:
 
     caption = message.caption or ""
     caption = caption.replace(f"@{BOT_USERNAME}", "").strip()
-    response = await get_ocr_response(caption, [photo], llm_code)
+    response = await get_ocr_response(caption, [photo])
 
     log_message(message=message,
                 request_type='process_image',
                 amount=1,
                 caption=caption,
-                ocr_response=response,
-                llm_code=llm_code)
+                ocr_response=response)
     await send_response(message, response)
 
 
-async def process_album(messages: list[Message], llm_code: str) -> None:
+async def process_album(messages: list[Message]) -> None:
     first_message = messages[0]
 
     if len(messages) > MAX_IMAGES_PER_REQUEST:
@@ -91,7 +89,7 @@ async def process_album(messages: list[Message], llm_code: str) -> None:
     caption = caption.replace(f"@{BOT_USERNAME}", "").strip()
     photos = [get_largest_photo(msg) for msg in messages]
 
-    response = await get_ocr_response(caption, photos, llm_code)
+    response = await get_ocr_response(caption, photos)
 
     log_message(
         message=first_message,
@@ -99,7 +97,6 @@ async def process_album(messages: list[Message], llm_code: str) -> None:
         amount=len(messages),
         caption=caption,
         ocr_response=response,
-        llm_code=llm_code,
     )
     await send_response(first_message, response)
 
@@ -124,11 +121,9 @@ async def handle_photo(message: Message):
         if media_id and media_id not in album_buffer:
             album_buffer[media_id] = []
 
-    llm_code = OCR_MODEL
-
     # Одиночное фото
     if not media_id:
-        await process_single_photo(message, llm_code)
+        await process_single_photo(message)
         return
 
     # Альбом: добавляем сообщение в буфер
@@ -140,4 +135,4 @@ async def handle_photo(message: Message):
     if not messages:
         return
 
-    await process_album(messages, llm_code)
+    await process_album(messages)

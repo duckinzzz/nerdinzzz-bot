@@ -4,8 +4,8 @@ from groq import RateLimitError
 from telegramify_markdown import convert
 
 from core.config import BOT_USERNAME
+from core.app import bot
 from utils import llm_utils, tti_utils, tts_utils, weather_utils
-from utils.db_utils import get_chat_llm
 from utils.logging_utils import log_message, log_error
 
 text_router = Router()
@@ -97,10 +97,10 @@ async def process_text_request(message: Message, text: str) -> None:
             weather_context = "\n\n[Данные о погоде: " + weather_data + "]"
             log_message(request_type='weather_fetch', message=message, weather_info=weather_data)
 
-    llm_code = await get_chat_llm(chat_id)
-    llm_response = await llm_utils.get_llm_response(text + weather_context, llm_code)
+    await bot.send_chat_action(chat_id=chat_id, action="typing")
+    llm_response = await llm_utils.get_llm_response(text + weather_context)
     text, entities = convert(llm_response)
-    log_message(request_type='llm_question', message=message, llm_response=llm_response, llm_code=llm_code)
+    log_message(request_type='llm_question', message=message, llm_response=llm_response)
     await send_response(text, entities=[e.to_dict() for e in entities])
 
 
