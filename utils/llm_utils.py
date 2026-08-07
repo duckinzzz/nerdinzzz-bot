@@ -1,18 +1,25 @@
 import base64
+import re
 import tempfile
 
 from aiogram import types
+from groq import AsyncGroq, APIStatusError as GroqAPIStatusError
 from openai import AsyncOpenAI, APIStatusError
 
 from core.app import bot
-from core.config import LLM_TOKEN
+from core.config import LLM_TOKEN, STT_TOKEN
 from core.constants import LLM_MODEL
 from utils.logging_utils import log_error
 
+# DeepSeek — text generation
 client = AsyncOpenAI(
     api_key=LLM_TOKEN,
     base_url="https://api.deepseek.com",
 )
+
+# Groq — vision/OCR (DeepSeek V4 Flash doesn't support images)
+groq_client = AsyncGroq(api_key=STT_TOKEN)
+OCR_MODEL = "qwen/qwen3.6-27b"
 
 
 def encode_image(image_path: str) -> str:
@@ -35,20 +42,17 @@ async def get_ocr_response(caption: str, photos: list[types.PhotoSize]) -> str:
     """
     caption: text description / caption
     photos: list of Telegram PhotoSize objects
+
+    Uses Groq (qwen3.6-27b) for vision
     """
     system_prompt = """
-    Ты — Nerdinzzz 🤓, LLM чат-бот на базе DeepSeek V4.
-    Твой создатель — @duckinzzz.
-    Твоя задача:
-    - Быстро и точно распознавать содержимое изображений.
-    - Преобразовывать текст с фото в текст (OCR) или давать краткий комментарий по изображению.
-    - Отвечать кратко, ясно и по делу, максимум 3-4 предложения.
-    - Если нужен список — только ключевые пункты.
-    - Используй нумерацию или маркеры для структурированных ответов, если необходимо.
-    - Не задавай встречных вопросов.
-    - Не объясняй свои действия и не добавляй приветствия или прощания.
-    - Всегда придерживайся нейтрального и дружелюбного тона.
-    - Не экранируй символы, кавычки или специальные знаки — выводи текст «как есть».
+    Ты — Nerdinzzz 🤓, OCR-бот. Твой создатель — @duckinzzz.
+
+    ЖЁСТКИЕ ПРАВИЛА:
+    1. Если на изображении есть ЛЮБОЙ текст (даже обрезанный, частичный, на любом языке) — выведи его ДОСЛОВНО, как есть. Ничего не добавляй, не summarise, не переводи.
+    2. Только если текста на изображении НЕТ СОВСЕМ — дай краткое описание (2-3 предложения), что на нём изображено.
+    3. Никаких вступлений, приветствий, прощаний.
+    4. Выводи текст «как есть», не экранируй символы.
     """
 
     # Encode all photos to base64
@@ -68,7 +72,7 @@ async def get_ocr_response(caption: str, photos: list[types.PhotoSize]) -> str:
     ]
 
     kwargs: dict = {
-        "model": LLM_MODEL,
+        "model": OCR_MODEL,
         "messages": messages,
         "temperature": 0.7,
         "max_completion_tokens": 4096,
@@ -78,16 +82,19 @@ async def get_ocr_response(caption: str, photos: list[types.PhotoSize]) -> str:
     }
 
     try:
-        completion = await client.chat.completions.create(**kwargs)
-        content = completion.choices[0].message.content.strip()
+        completion = await groq_client.chat.completions.create(**kwargs)
+        raw = completion.choices[0].message.content or ""
+
+        # Strip Qwen reasoning tags — Telegram can't parse them as Markdown
+        content = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
 
         if not content:
             log_error(request_type='process_image', caption=caption, error='empty_response')
             return "❌ Модель не смогла ответить на ваш вопрос. Попробуйте другое изображение."
 
-        return content.strip()
+        return content
 
-    except APIStatusError as e:
+    except GroqAPIStatusError as e:
         if e.status_code == 413:
             log_error(request_type='process_image', caption=caption, error=e)
             return "❌ Сообщение слишком длинное, попробуйте укоротить сообщение"

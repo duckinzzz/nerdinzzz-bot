@@ -3,9 +3,11 @@ import asyncio
 from aiogram import F, Router
 from aiogram.types import Message, PhotoSize
 
+from aiogram.exceptions import TelegramBadRequest
+
 from core.config import BOT_USERNAME
 from utils.llm_utils import get_ocr_response
-from utils.logging_utils import log_message
+from utils.logging_utils import log_message, log_error
 
 photo_router = Router()
 
@@ -40,10 +42,17 @@ def validate_photo_limits(photo: PhotoSize) -> None:
 
 
 async def send_response(message: Message, text: str) -> None:
-    if message.chat.type in ("group", "supergroup"):
-        await message.reply(text, parse_mode="Markdown")
-    else:
-        await message.answer(text, parse_mode="Markdown")
+    try:
+        if message.chat.type in ("group", "supergroup"):
+            await message.reply(text, parse_mode="Markdown")
+        else:
+            await message.answer(text, parse_mode="Markdown")
+    except TelegramBadRequest:
+        # Fallback to plain text if Markdown parsing fails
+        if message.chat.type in ("group", "supergroup"):
+            await message.reply(text)
+        else:
+            await message.answer(text)
 
 
 async def process_single_photo(message: Message) -> None:
