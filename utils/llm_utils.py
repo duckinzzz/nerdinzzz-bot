@@ -106,7 +106,7 @@ async def get_ocr_response(caption: str, photos: list[types.PhotoSize]) -> str:
         return "❌ Ошибка при обработке изображения"
 
 
-async def get_llm_response(user_prompt: str) -> str:
+async def get_llm_response(user_prompt: str, chat_id: int | None = None) -> str:
     system_prompt = """
     Ты — Nerdinzzz 🤓, LLM чат-бот на базе DeepSeek V4.
     Твой создатель — @duckinzzz.
@@ -148,10 +148,14 @@ async def get_llm_response(user_prompt: str) -> str:
         completion = await client.chat.completions.create(**kwargs)
         msg = completion.choices[0].message
 
-        # Function calling loop (max 3 tool-call rounds to prevent infinite loops)
-        for _ in range(3):
+        # Function calling loop (max 2 rounds: 1 tool round + 1 final response)
+        for _ in range(2):
             if not msg.tool_calls:
                 break
+
+            # Refresh typing indicator — Telegram expires it after ~5s
+            if chat_id is not None:
+                await bot.send_chat_action(chat_id=chat_id, action="typing")
 
             # Execute tools
             tool_results = await registry.execute(msg.tool_calls)
@@ -174,7 +178,7 @@ async def get_llm_response(user_prompt: str) -> str:
             })
             messages.extend(tool_results)
 
-            # Second LLM call — with tool results
+            # Follow-up LLM call — with tool results
             kwargs["messages"] = messages
             completion = await client.chat.completions.create(**kwargs)
             msg = completion.choices[0].message

@@ -89,8 +89,7 @@ async def process_text_request(message: Message, text: str) -> None:
         return
 
     # Обычный LLM запрос
-    await bot.send_chat_action(chat_id=chat_id, action="typing")
-    llm_response = await llm_utils.get_llm_response(text)
+    llm_response = await llm_utils.get_llm_response(text, chat_id=chat_id)
     text, entities = convert(llm_response)
     log_message(request_type='llm_question', message=message, llm_response=llm_response)
     await send_response(text, entities=[e.to_dict() for e in entities])
