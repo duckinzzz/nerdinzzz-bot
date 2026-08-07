@@ -48,12 +48,11 @@ jobs:
 
             cat > .env <<EOF
             ENV=${{ secrets.ENV }}
-            ADMIN_ID=${{ secrets.ADMIN_ID }}
             BOT_TOKEN=${{ secrets.BOT_TOKEN }}
             BOT_USERNAME=${{ secrets.BOT_USERNAME }}
             LLM_TOKEN=${{ secrets.LLM_TOKEN }}
             STT_TOKEN=${{ secrets.STT_TOKEN }}
-            TTS_TOKEN=${{ secrets.STT_TOKEN }}
+            TTS_TOKEN=${{ secrets.TTS_TOKEN }}
             
             WEBHOOK_URL=${{ secrets.WEBHOOK_URL }}
             WEBHOOK_PATH=${{ secrets.WEBHOOK_PATH }}
@@ -67,6 +66,7 @@ jobs:
             
             CF_ACCOUNT_ID=${{ secrets.CF_ACCOUNT_ID }}
             CF_API_TOKEN=${{ secrets.CF_API_TOKEN }}
+            BOTSTATS_API_TOKEN=${{ secrets.BOTSTATS_API_TOKEN }}
             EOF
 
             IMAGE_TAG=${{ github.sha }}

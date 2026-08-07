@@ -23,10 +23,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from openai.types.chat import (
-    ChatCompletionMessage,
-    ChatCompletionMessageToolCall,
-)
+from openai.types.chat import ChatCompletionMessageToolCall
 
 from utils.logging_utils import logger
 

@@ -4,4 +4,3 @@
 .github/
 **/__pycache__/
 *.pyc
-logging/

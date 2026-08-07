@@ -35,10 +35,6 @@ SUMMARY_PROMPT = """
 - @duckinzzz поделился ссылкой на пак стикеров
 """
 
-SUPPORTED_MSG_TYPES = ["text",
-                       "voice",
-                       "video_note",
-                       "photo"]
 
 HALLUCINATIONS = {
     'thanks for watching',
