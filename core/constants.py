@@ -1,7 +1,7 @@
 LLM_MODEL = "deepseek-v4-flash"
 
 # Количество сообщений для хранения и анализа
-MESSAGE_HISTORY_LIMIT = 50
+MESSAGE_HISTORY_LIMIT = 100
 
 # Максимальное число сообщений пользователя в контексте LLM-диалога
 CONTEXT_LIMIT = 20
