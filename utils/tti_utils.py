@@ -22,7 +22,6 @@ async def generate_image(prompt: str) -> BufferedInputFile | None:
 
     payload = {
         "prompt": prompt,
-        "image_size": "512x512"
     }
 
     try:
