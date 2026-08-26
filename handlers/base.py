@@ -1,8 +1,9 @@
 from aiogram import Router
-from aiogram.filters import CommandStart
+from aiogram.filters import Command, CommandStart
 from aiogram.types import Message
 
 from core.config import BOT_USERNAME
+from utils.db_utils import clear_context
 from utils.logging_utils import log_event
 
 base_router = Router()
@@ -25,3 +26,12 @@ async def cmd_start(message: Message):
 
     await message.answer(welcome_text, parse_mode="Markdown")
     log_event(event='bot_start', username=username, user_id=uid, chat_id=message.chat.id)
+
+
+@base_router.message(Command("clear_context"))
+async def cmd_clear_context(message: Message):
+    """Очистить контекст LLM-диалога для этого чата"""
+    chat_id = message.chat.id
+    await clear_context(chat_id)
+    log_event(event='clear_context', chat_id=chat_id, user_id=message.from_user.id if message.from_user else None)
+    await message.reply("🧹 Контекст очищен")

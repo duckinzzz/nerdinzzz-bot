@@ -6,6 +6,8 @@ from aiogram.types import Message, PhotoSize
 from aiogram.exceptions import TelegramBadRequest
 
 from core.config import BOT_USERNAME
+from core.constants import CONTEXT_LIMIT
+from utils.db_utils import save_context_message, trim_context
 from utils.llm_utils import get_ocr_response
 from utils.logging_utils import log_message, log_error
 
@@ -74,6 +76,11 @@ async def process_single_photo(message: Message) -> None:
                 ocr_response=response)
     await send_response(message, response)
 
+    chat_id = message.chat.id
+    await save_context_message(chat_id, "user", caption or "📷 Фото")
+    await save_context_message(chat_id, "assistant", response)
+    await trim_context(chat_id, keep_users=CONTEXT_LIMIT)
+
 
 async def process_album(messages: list[Message]) -> None:
     first_message = messages[0]
@@ -108,6 +115,11 @@ async def process_album(messages: list[Message]) -> None:
         ocr_response=response,
     )
     await send_response(first_message, response)
+
+    chat_id = first_message.chat.id
+    await save_context_message(chat_id, "user", caption or "📷 Фото")
+    await save_context_message(chat_id, "assistant", response)
+    await trim_context(chat_id, keep_users=CONTEXT_LIMIT)
 
 
 @photo_router.message(F.content_type == "photo")

@@ -37,6 +37,7 @@ async def init_db() -> None:
     )
 
     await init_message_history_table()
+    await init_chat_context_table()
 
     logger.info("Database initialized")
 
@@ -86,6 +87,41 @@ async def init_message_history_table() -> None:
         await conn.execute("""
                            CREATE INDEX IF NOT EXISTS idx_message_history_chat_timestamp
                                ON message_history(chat_id, timestamp DESC);
+                           """)
+
+
+async def init_chat_context_table() -> None:
+    """Создать таблицу для контекста LLM-диалога"""
+    async with pool.acquire() as conn:
+        await conn.execute("""
+                           CREATE TABLE IF NOT EXISTS chat_context
+                           (
+                               id
+                               SERIAL
+                               PRIMARY
+                               KEY,
+                               chat_id
+                               BIGINT
+                               NOT
+                               NULL,
+                               role
+                               TEXT
+                               NOT
+                               NULL,
+                               content
+                               TEXT
+                               NOT
+                               NULL,
+                               ts
+                               TIMESTAMPTZ
+                               DEFAULT
+                               CURRENT_TIMESTAMP
+                           );
+                           """)
+
+        await conn.execute("""
+                           CREATE INDEX IF NOT EXISTS idx_chat_context_chat_ts
+                               ON chat_context(chat_id, ts);
                            """)
 
 
@@ -167,6 +203,58 @@ async def cleanup_all_chats(keep_last: int = MESSAGE_HISTORY_LIMIT) -> dict:
             results[chat_id] = deleted
 
         return results
+
+
+async def save_context_message(chat_id: int, role: str, content: str) -> None:
+    """Сохранить сообщение в контекст LLM-диалога (role: user | assistant)"""
+    async with pool.acquire() as conn:
+        await conn.execute("""
+                           INSERT INTO chat_context (chat_id, role, content)
+                           VALUES ($1, $2, $3)
+                           """, chat_id, role, content)
+
+
+async def get_context_messages(chat_id: int) -> List[dict]:
+    """Получить сообщения контекста чата в хронологическом порядке"""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+                                SELECT role, content
+                                FROM chat_context
+                                WHERE chat_id = $1
+                                ORDER BY ts ASC, id ASC
+                                """, chat_id)
+        return [{"role": row["role"], "content": row["content"]} for row in rows]
+
+
+async def trim_context(chat_id: int, keep_users: int = 20) -> None:
+    """
+    Обрезать контекст, оставив последние keep_users сообщений пользователя
+    и все ответы бота после первого сохранённого.
+    """
+    async with pool.acquire() as conn:
+        # Ищем id первого сообщения, с которого начинаются последние keep_users user-сообщений
+        row = await conn.fetchrow("""
+                                  SELECT id
+                                  FROM chat_context
+                                  WHERE chat_id = $1 AND role = 'user'
+                                  ORDER BY ts DESC, id DESC
+                                  LIMIT 1 OFFSET $2
+                                  """, chat_id, max(keep_users - 1, 0))
+        # Если user-сообщений меньше или равно keep_users — ничего не чистим
+        if row is None:
+            return
+
+        cut_id = row["id"]
+        await conn.execute("""
+                           DELETE FROM chat_context
+                           WHERE chat_id = $1 AND id < $2
+                           """, chat_id, cut_id)
+
+
+async def clear_context(chat_id: int) -> None:
+    """Полностью очистить контекст чата"""
+    async with pool.acquire() as conn:
+        await conn.execute("DELETE FROM chat_context WHERE chat_id = $1", chat_id)
 
 
 async def close_db() -> None:

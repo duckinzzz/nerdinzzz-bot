@@ -108,7 +108,11 @@ async def get_ocr_response(caption: str, photos: list[types.PhotoSize]) -> str:
         return "❌ Ошибка при обработке изображения"
 
 
-async def get_llm_response(user_prompt: str, chat_id: int | None = None) -> str:
+async def get_llm_response(
+        user_prompt: str,
+        chat_id: int | None = None,
+        history: list[dict] | None = None,
+) -> str:
     system_prompt = """
     Ты — Nerdinzzz 🤓, LLM чат-бот на базе DeepSeek V4.
     Твой создатель — @duckinzzz.
@@ -127,8 +131,10 @@ async def get_llm_response(user_prompt: str, chat_id: int | None = None) -> str:
 
     messages: list[dict] = [
         {"role": "system", "content": system_prompt.lower()},
-        {"role": "user", "content": user_prompt},
     ]
+    if history:
+        messages.extend(history)
+    messages.append({"role": "user", "content": user_prompt})
 
     registry = get_tool_registry()
     tools = registry.get_openai_definitions() if registry.has_tools() else None

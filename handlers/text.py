@@ -5,7 +5,9 @@ from telegramify_markdown import convert
 
 from core.config import BOT_USERNAME
 from core.app import bot
+from core.constants import CONTEXT_LIMIT
 from utils import llm_utils, tti_utils, tts_utils
+from utils.db_utils import get_context_messages, save_context_message, trim_context
 from utils.logging_utils import log_message, log_error
 
 text_router = Router()
@@ -89,10 +91,16 @@ async def process_text_request(message: Message, text: str) -> None:
         return
 
     # Обычный LLM запрос
-    llm_response = await llm_utils.get_llm_response(text, chat_id=chat_id)
+    history = await get_context_messages(chat_id)
+    llm_response = await llm_utils.get_llm_response(text, chat_id=chat_id, history=history)
     text, entities = convert(llm_response)
     log_message(request_type='llm_question', message=message, llm_response=llm_response)
     await send_response(text, entities=[e.to_dict() for e in entities])
+
+    # Сохраняем диалог в контекст и обрезаем до лимита
+    await save_context_message(chat_id, "user", text)
+    await save_context_message(chat_id, "assistant", llm_response)
+    await trim_context(chat_id, keep_users=CONTEXT_LIMIT)
 
 
 
