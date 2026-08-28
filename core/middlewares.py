@@ -45,7 +45,7 @@ class MessageHistoryMiddleware(BaseMiddleware):
         return await handler(message, data)
 
 
-BOTSTATS_URL = "http://duckinzzz.ru/botstats/api/"
+BOTSTATS_URL = "https://botstats.duckinzzz.ru/api/"
 
 
 class BotStatsMiddleware(BaseMiddleware):
