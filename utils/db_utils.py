@@ -39,12 +39,13 @@ async def init_db() -> None:
 
     await init_message_history_table()
     await init_chat_context_table()
+    await init_user_table()
 
     logger.info("Database initialized")
 
 
 async def init_message_history_table() -> None:
-    """Создать таблицу для истории сообщений"""
+    """Создать таблицу для истории сообщений (без дублирования данных о пользователях)"""
     async with pool.acquire() as conn:
         await conn.execute("""
                            CREATE TABLE IF NOT EXISTS message_history
@@ -65,10 +66,6 @@ async def init_message_history_table() -> None:
                                BIGINT
                                NOT
                                NULL,
-                               username
-                               TEXT,
-                               first_name
-                               TEXT,
                                text
                                TEXT
                                NOT
@@ -78,12 +75,6 @@ async def init_message_history_table() -> None:
                                DEFAULT
                                CURRENT_TIMESTAMP
                            );
-                           """)
-
-        # Миграция для уже существующих БД
-        await conn.execute("""
-                           ALTER TABLE message_history
-                               ADD COLUMN IF NOT EXISTS first_name TEXT;
                            """)
 
         # UNIQUE индекс для защиты от дубликатов
@@ -97,6 +88,55 @@ async def init_message_history_table() -> None:
                            CREATE INDEX IF NOT EXISTS idx_message_history_chat_timestamp
                                ON message_history(chat_id, timestamp DESC);
                            """)
+
+
+async def init_user_table() -> None:
+    """
+    Создать таблицу пользователей (нормализованные данные) и мигрировать
+    legacy-схему message_history, где username/first_name дублировались в каждой строке.
+
+    Для уже существующих БД:
+      1. заполняет users из message_history (приоритет — не-NULL имена);
+      2. удаляет колонки username/first_name из message_history.
+    """
+    async with pool.acquire() as conn:
+        await conn.execute("""
+                           CREATE TABLE IF NOT EXISTS users
+                           (
+                               user_id
+                               BIGINT
+                               PRIMARY
+                               KEY,
+                               username
+                               TEXT,
+                               first_name
+                               TEXT
+                           );
+                           """)
+
+        # Миграция только для legacy-схемы, где колонки ещё существуют
+        has_username = await conn.fetchval("""
+                                           SELECT EXISTS (
+                                               SELECT 1
+                                               FROM information_schema.columns
+                                               WHERE table_name = 'message_history'
+                                                 AND column_name = 'username'
+                                           );
+                                           """)
+
+        if has_username:
+            await conn.execute("""
+                               INSERT INTO users (user_id, username, first_name)
+                               SELECT DISTINCT ON (user_id)
+                                   user_id, username, first_name
+                               FROM message_history
+                               WHERE user_id IS NOT NULL
+                               ORDER BY user_id, (first_name IS NULL), (username IS NULL)
+                               ON CONFLICT (user_id) DO NOTHING;
+                               """)
+            await conn.execute("ALTER TABLE message_history DROP COLUMN IF EXISTS username;")
+            await conn.execute("ALTER TABLE message_history DROP COLUMN IF EXISTS first_name;")
+            logger.info("Users table populated from legacy message_history")
 
 
 async def init_chat_context_table() -> None:
@@ -142,12 +182,26 @@ async def save_message(
         first_name: Optional[str],
         text: str
 ) -> None:
-    """Сохранить сообщение в БД (с защитой от дубликатов)"""
+    """Сохранить сообщение в БД (с защитой от дубликатов).
+
+    Данные пользователя пишутся в таблицу users (нормализованно),
+    в message_history хранится только user_id.
+    """
     async with pool.acquire() as conn:
-        await conn.execute("""
-                           INSERT INTO message_history (chat_id, message_id, user_id, username, first_name, text)
-                           VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (chat_id, message_id) DO NOTHING
-                           """, chat_id, message_id, user_id, username, first_name, text)
+        async with conn.transaction():
+            if user_id:
+                await conn.execute("""
+                                   INSERT INTO users (user_id, username, first_name)
+                                   VALUES ($1, $2, $3)
+                                   ON CONFLICT (user_id) DO UPDATE SET
+                                       username = COALESCE(EXCLUDED.username, users.username),
+                                       first_name = COALESCE(EXCLUDED.first_name, users.first_name)
+                                   """, user_id, username, first_name)
+
+            await conn.execute("""
+                               INSERT INTO message_history (chat_id, message_id, user_id, text)
+                               VALUES ($1, $2, $3, $4) ON CONFLICT (chat_id, message_id) DO NOTHING
+                               """, chat_id, message_id, user_id, text)
 
 
 async def get_last_messages(
@@ -157,10 +211,13 @@ async def get_last_messages(
     """Получить последние N сообщений из чата"""
     async with pool.acquire() as conn:
         rows = await conn.fetch("""
-                                SELECT message_id, user_id, username, first_name, text, timestamp
-                                FROM message_history
-                                WHERE chat_id = $1
-                                ORDER BY timestamp DESC, id DESC
+                                SELECT m.message_id, m.user_id,
+                                       u.username, u.first_name,
+                                       m.text, m.timestamp
+                                FROM message_history m
+                                LEFT JOIN users u ON u.user_id = m.user_id
+                                WHERE m.chat_id = $1
+                                ORDER BY m.timestamp DESC, m.id DESC
                                     LIMIT $2
                                 """, chat_id, limit)
 
