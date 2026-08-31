@@ -37,6 +37,7 @@ class MessageHistoryMiddleware(BaseMiddleware):
                 message_id=message.message_id,
                 user_id=message.from_user.id if message.from_user else 0,
                 username=message.from_user.username if message.from_user else None,
+                first_name=message.from_user.first_name if message.from_user else None,
                 text=message.text or message.caption or ""
             )
         except Exception as e:

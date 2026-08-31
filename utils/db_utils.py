@@ -18,6 +18,7 @@ class MessageRecord:
     message_id: int
     user_id: int
     username: Optional[str]
+    first_name: Optional[str]
     text: str
     timestamp: datetime
 
@@ -66,6 +67,8 @@ async def init_message_history_table() -> None:
                                NULL,
                                username
                                TEXT,
+                               first_name
+                               TEXT,
                                text
                                TEXT
                                NOT
@@ -75,6 +78,12 @@ async def init_message_history_table() -> None:
                                DEFAULT
                                CURRENT_TIMESTAMP
                            );
+                           """)
+
+        # Миграция для уже существующих БД
+        await conn.execute("""
+                           ALTER TABLE message_history
+                               ADD COLUMN IF NOT EXISTS first_name TEXT;
                            """)
 
         # UNIQUE индекс для защиты от дубликатов
@@ -130,14 +139,15 @@ async def save_message(
         message_id: int,
         user_id: int,
         username: Optional[str],
+        first_name: Optional[str],
         text: str
 ) -> None:
     """Сохранить сообщение в БД (с защитой от дубликатов)"""
     async with pool.acquire() as conn:
         await conn.execute("""
-                           INSERT INTO message_history (chat_id, message_id, user_id, username, text)
-                           VALUES ($1, $2, $3, $4, $5) ON CONFLICT (chat_id, message_id) DO NOTHING
-                           """, chat_id, message_id, user_id, username, text)
+                           INSERT INTO message_history (chat_id, message_id, user_id, username, first_name, text)
+                           VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (chat_id, message_id) DO NOTHING
+                           """, chat_id, message_id, user_id, username, first_name, text)
 
 
 async def get_last_messages(
@@ -147,7 +157,7 @@ async def get_last_messages(
     """Получить последние N сообщений из чата"""
     async with pool.acquire() as conn:
         rows = await conn.fetch("""
-                                SELECT message_id, user_id, username, text, timestamp
+                                SELECT message_id, user_id, username, first_name, text, timestamp
                                 FROM message_history
                                 WHERE chat_id = $1
                                 ORDER BY timestamp DESC, id DESC
@@ -160,6 +170,7 @@ async def get_last_messages(
                 message_id=row["message_id"],
                 user_id=row["user_id"],
                 username=row["username"],
+                first_name=row["first_name"],
                 text=row["text"],
                 timestamp=row["timestamp"]
             )

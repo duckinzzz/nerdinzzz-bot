@@ -41,6 +41,7 @@ async def summary_handler(message: Message, bot: Bot):
                 "message_id": msg.message_id,
                 "user_id": msg.user_id,
                 "username": msg.username,
+                "first_name": msg.first_name,
                 "text": msg.text
             }
             for msg in messages
@@ -60,7 +61,7 @@ async def summary_handler(message: Message, bot: Bot):
             messages_count=len(messages),
             chat_id=chat_id
         )
-        await message.reply(summary)
+        await message.reply(summary, parse_mode="HTML")
 
     except Exception as e:
         await status_msg.delete()

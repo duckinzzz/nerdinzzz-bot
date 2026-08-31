@@ -1,4 +1,5 @@
 import base64
+import html
 import re
 import tempfile
 
@@ -262,16 +263,45 @@ async def make_prompt(user_prompt: str) -> str:
         return ''
 
 
+def make_message_link(chat_id: int, message_id: int) -> str:
+    """
+    Build a t.me/c/ deep-link to a message in a private chat/channel.
+
+    Private supergroup ids are negative with a '-100' prefix
+    (e.g. -1002539915851), which Telegram strips from the link:
+    https://t.me/c/2539915851/{message_id}
+    """
+    s = str(chat_id)
+    if s.startswith("-100"):
+        s = s[4:]
+    elif s.startswith("-"):
+        s = s[1:]
+    return f"https://t.me/c/{s}/{message_id}"
+
+
+def links_to_html(text: str) -> str:
+    """
+    Escape text for Telegram HTML parse_mode, then convert LLM's
+    [word](https://t.me/...) markdown-style links into <a> hyperlinks.
+    """
+    text = html.escape(text)
+    return re.sub(
+        r"\[([^\]]+)\]\((https://t\.me/[^)\s]+)\)",
+        r'<a href="\2">\1</a>',
+        text,
+    )
+
+
 async def generate_summary(messages_json: list[dict], chat_id: int, total_count: int, bot_username: str) -> str:
     """
     Generate a summary of chat messages.
 
-    messages_json: list of dicts with {username, text, message_id}
+    messages_json: list of dicts with {username, first_name, text, message_id}
     chat_id: chat ID
     total_count: number of messages
     bot_username: bot's username (to filter out its own responses)
 
-    Returns summary in format:
+    Returns HTML summary with word-links to source messages:
     🤓 AI проанализировал N сообщений.
     Вот что вы пропустили:
     [Topics with descriptions]
@@ -291,8 +321,11 @@ async def generate_summary(messages_json: list[dict], chat_id: int, total_count:
         if username.lower() == f"@{bot_username}".lower():
             continue
 
+        # Use first name when available, fall back to @username
+        display = msg.get('first_name') or username
         text = msg.get('text', '')
-        messages_text.append(f"{username}: {text}")
+        link = make_message_link(chat_id, msg.get('message_id'))
+        messages_text.append(f"{display} [сообщение {link}]: {text}")
 
     context = "\n".join(messages_text)
 
@@ -301,7 +334,9 @@ async def generate_summary(messages_json: list[dict], chat_id: int, total_count:
 Сообщения:
 {context}
 
-Сделай саммари на русском языке."""
+Сделай саммари на русском языке.
+Чтобы связать слово с сообщением, оберни его в ссылку так: [слово](https://t.me/c/.../MESSAGE_ID).
+Используй только ссылки [сообщение https://t.me/c/...] из контекста выше, не выдумывай новых."""
 
     messages = [
         {"role": "system", "content": system_prompt},
@@ -325,9 +360,9 @@ async def generate_summary(messages_json: list[dict], chat_id: int, total_count:
             log_error(request_type='summary', chat_id=chat_id, error='empty_response')
             return "❌ Не удалось сгенерировать саммари. Попробуйте позже."
 
-        # Format header
+        # Format header + escape content and convert word-links to HTML
         header = f"🤓 Я проанализировал {total_count} сообщений.\nВот что вы пропустили:\n\n"
-        return header + summary
+        return header + links_to_html(summary)
 
     except APIStatusError as e:
         if e.status_code == 413:
