@@ -12,10 +12,7 @@ summary_router = Router()
 
 @summary_router.message(Command("summary"))
 async def summary_handler(message: Message, bot: Bot):
-    """
-    Обработчик команды /summary.
-    Получает последние сообщения из чата и генерирует саммари.
-    """
+    """Handle /summary: generate a summary of recent chat messages."""
     chat_id = message.chat.id
 
     if message.chat.type not in ("group", "supergroup"):

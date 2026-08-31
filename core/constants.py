@@ -1,12 +1,12 @@
 LLM_MODEL = "deepseek-v4-flash"
 
-# Количество сообщений для хранения и анализа
+# Number of messages to store and analyze
 MESSAGE_HISTORY_LIMIT = 100
 
-# Максимальное число сообщений пользователя в контексте LLM-диалога
+# Max user messages kept in the LLM dialog context
 CONTEXT_LIMIT = 20
 
-# Промпт для генерации саммари
+# Prompt for summary generation
 SUMMARY_PROMPT = """
 Ты — ассистент для создания кратких саммари переписки в чате.
 

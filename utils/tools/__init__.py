@@ -36,16 +36,12 @@ class ToolRegistry:
     def __init__(self) -> None:
         self._tools: dict[str, Tool] = {}
 
-    # ── Registration ────────────────────────────────────────────────
-
     def register(self, tool: Tool) -> None:
         if tool.name in self._tools:
             raise ValueError(f"Tool '{tool.name}' is already registered")
         self._tools[tool.name] = tool
         tool._registered = True
         logger.debug(f"Tool registered: {tool.name}")
-
-    # ── OpenAI-compatible definitions ───────────────────────────────
 
     def get_openai_definitions(self) -> list[dict[str, Any]]:
         """Return tool definitions in OpenAI function-calling format."""
@@ -60,8 +56,6 @@ class ToolRegistry:
             }
             for t in self._tools.values()
         ]
-
-    # ── Execution ───────────────────────────────────────────────────
 
     async def execute(self, tool_calls: list[ChatCompletionMessageToolCall]) -> list[dict[str, Any]]:
         """Execute tool calls from an LLM response.
@@ -104,7 +98,6 @@ class ToolRegistry:
         return len(self._tools)
 
 
-# ── Singleton ──────────────────────────────────────────────────────────
 _registry: ToolRegistry | None = None
 
 
@@ -123,7 +116,6 @@ def init_tools() -> ToolRegistry:
     """
     registry = get_tool_registry()
 
-    # ── Import and register each tool ──────────────────────────────
     from utils.tools.search import search_tool  # noqa: E402
     from utils.tools.weather import weather_tool  # noqa: E402
 

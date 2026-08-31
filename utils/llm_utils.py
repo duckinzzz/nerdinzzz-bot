@@ -169,14 +169,12 @@ async def get_llm_response(
             if chat_id is not None:
                 await bot.send_chat_action(chat_id=chat_id, action="typing")
 
-            # Execute tools
             tool_results = await registry.execute(msg.tool_calls)
             log_event(
                 event="tool_calls",
                 tools=[tc.function.name for tc in msg.tool_calls],
             )
 
-            # Append assistant message + tool results to history
             messages.append({
                 "role": "assistant",
                 "content": msg.content or "",
@@ -301,10 +299,7 @@ async def generate_summary(messages_json: list[dict], chat_id: int, total_count:
     total_count: number of messages
     bot_username: bot's username (to filter out its own responses)
 
-    Returns HTML summary with word-links to source messages:
-    🤓 AI проанализировал N сообщений.
-    Вот что вы пропустили:
-    [Topics with descriptions]
+    Returns HTML summary with a header and word-links to source messages.
     """
     from core.constants import SUMMARY_PROMPT
 

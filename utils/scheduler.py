@@ -7,12 +7,9 @@ from utils.logging_utils import logger
 
 
 async def run_daily_cleanup(bot: Bot) -> None:
-    """
-    Периодическая очистка старых сообщений (каждые 24 часа).
-    Оставляет последние MESSAGE_HISTORY_LIMIT сообщений в каждом чате.
-    """
+    """Trim old messages in every chat every 24 hours."""
     while True:
-        await asyncio.sleep(86400)  # 24 часа
+        await asyncio.sleep(86400)  # 24 hours
 
         try:
             results = await cleanup_all_chats()

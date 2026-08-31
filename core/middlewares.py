@@ -22,7 +22,7 @@ class LuckyEmojiMiddleware(BaseMiddleware):
 
 
 class MessageHistoryMiddleware(BaseMiddleware):
-    """Сохраняет все сообщения в БД для истории чата"""
+    """Store every chat message for the history."""
 
     async def __call__(
             self,
@@ -30,7 +30,6 @@ class MessageHistoryMiddleware(BaseMiddleware):
             message: Message,
             data: Dict[str, Any]
     ) -> Any:
-        # Сохраняем сообщение в БД
         try:
             await save_message(
                 chat_id=message.chat.id,

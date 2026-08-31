@@ -14,11 +14,10 @@ text_router = Router()
 
 
 async def process_text_request(message: Message, text: str) -> None:
-    """Обработка текстового запроса: генерация изображения, голоса или LLM-ответ."""
+    """Handle a text request: image/voice generation or LLM reply."""
     chat_id = message.chat.id
     is_group = message.chat.type in ("group", "supergroup")
 
-    # Вспомогательная функция для отправки ответа
     async def send_response(response_text: str = None, photo=None, voice=None, entities=None):
         if photo:
             if is_group:
@@ -90,14 +89,14 @@ async def process_text_request(message: Message, text: str) -> None:
             await send_response("❌ Не смог выговорить")
         return
 
-    # Обычный LLM запрос
+    # Regular LLM request
     history = await get_context_messages(chat_id)
     llm_response = await llm_utils.get_llm_response(text, chat_id=chat_id, history=history)
     text, entities = convert(llm_response)
     log_message(request_type='llm_question', message=message, llm_response=llm_response)
     await send_response(text, entities=[e.to_dict() for e in entities])
 
-    # Сохраняем диалог в контекст и обрезаем до лимита
+    # Save the dialog to context, then trim to the limit
     await save_context_message(chat_id, "user", text)
     await save_context_message(chat_id, "assistant", llm_response)
     await trim_context(chat_id, keep_users=CONTEXT_LIMIT)

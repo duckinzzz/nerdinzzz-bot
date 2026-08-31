@@ -8,7 +8,6 @@ from utils.logging_utils import logger
 
 from .base import Tool
 
-# ── WMO weather codes → Russian ────────────────────────────────────────
 _WMO_CODES: dict[int, str] = {
     0: "ясно ☀️",
     1: "преимущественно ясно 🌤",
@@ -45,7 +44,6 @@ def _weather_code_desc(code: int) -> str:
     return _WMO_CODES.get(code, f"код {code}")
 
 
-# ── Open-Meteo API calls ───────────────────────────────────────────────
 _GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"
 _FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 
@@ -112,7 +110,6 @@ async def _get_forecast(lat: float, lon: float) -> dict | None:
         return None
 
 
-# ── Public tool handler ────────────────────────────────────────────────
 async def get_weather(city: str) -> str:
     """Return a human-readable weather summary for the given city."""
     geo = await _geocode(city)
@@ -156,7 +153,6 @@ async def get_weather(city: str) -> str:
     return "\n".join(lines)
 
 
-# ── Tool definition ────────────────────────────────────────────────────
 weather_tool = Tool(
     name="get_weather",
     description=(

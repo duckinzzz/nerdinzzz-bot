@@ -128,30 +128,30 @@ async def handle_photo(message: Message):
     is_group = message.chat.type in ("group", "supergroup")
     caption = message.caption or ""
 
-    # Для групповых чатов проверяем упоминание бота
+    # In groups, require a bot mention
     if is_group:
         if not caption.startswith(f"@{BOT_USERNAME}"):
-            # Для альбомов проверяем, был ли уже добавлен media_id (если предыдущее фото имело упоминание)
+            # For albums, only proceed if a previous photo already mentioned the bot
             if not media_id or media_id not in album_buffer:
                 return
-        # Если есть упоминание и media_id отсутствует в буфере, инициализируем список
+        # Start buffering an album once the bot is mentioned
         if media_id and media_id not in album_buffer:
             album_buffer[media_id] = []
-    # Для приватных чатов всегда инициализируем буфер для альбомов
+    # In private chats, always buffer albums
     else:
         if media_id and media_id not in album_buffer:
             album_buffer[media_id] = []
 
-    # Одиночное фото
+    # Single photo
     if not media_id:
         await process_single_photo(message)
         return
 
-    # Альбом: добавляем сообщение в буфер
+    # Album: buffer the photo
     album_buffer[media_id].append(message)
     await asyncio.sleep(0.5)
 
-    # Извлекаем накопленные сообщения (если это последнее фото альбома)
+    # Flush buffered photos once the last album message arrives
     messages = album_buffer.pop(media_id, None)
     if not messages:
         return

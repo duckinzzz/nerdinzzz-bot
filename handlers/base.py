@@ -30,7 +30,7 @@ async def cmd_start(message: Message):
 
 @base_router.message(Command("clear_context"))
 async def cmd_clear_context(message: Message):
-    """Очистить контекст LLM-диалога для этого чата"""
+    """Clear the LLM dialog context for this chat."""
     chat_id = message.chat.id
     await clear_context(chat_id)
     log_event(event='clear_context', chat_id=chat_id, user_id=message.from_user.id if message.from_user else None)

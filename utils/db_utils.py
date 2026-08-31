@@ -14,7 +14,7 @@ pool: Pool
 
 @dataclass
 class MessageRecord:
-    """Запись сообщения в истории"""
+    """A single chat message."""
     message_id: int
     user_id: int
     username: Optional[str]
@@ -45,7 +45,7 @@ async def init_db() -> None:
 
 
 async def init_message_history_table() -> None:
-    """Создать таблицу для истории сообщений (без дублирования данных о пользователях)"""
+    """Create the message history table."""
     async with pool.acquire() as conn:
         await conn.execute("""
                            CREATE TABLE IF NOT EXISTS message_history
@@ -77,13 +77,13 @@ async def init_message_history_table() -> None:
                            );
                            """)
 
-        # UNIQUE индекс для защиты от дубликатов
+        # Prevent duplicate (chat_id, message_id) rows
         await conn.execute("""
                            CREATE UNIQUE INDEX IF NOT EXISTS uq_message_history_chat_message
                                ON message_history(chat_id, message_id);
                            """)
 
-        # Индекс для быстрого поиска по чату
+        # Speed up per-chat lookups
         await conn.execute("""
                            CREATE INDEX IF NOT EXISTS idx_message_history_chat_timestamp
                                ON message_history(chat_id, timestamp DESC);
@@ -91,14 +91,7 @@ async def init_message_history_table() -> None:
 
 
 async def init_user_table() -> None:
-    """
-    Создать таблицу пользователей (нормализованные данные) и мигрировать
-    legacy-схему message_history, где username/first_name дублировались в каждой строке.
-
-    Для уже существующих БД:
-      1. заполняет users из message_history (приоритет — не-NULL имена);
-      2. удаляет колонки username/first_name из message_history.
-    """
+    """Create the users table (normalized user data)."""
     async with pool.acquire() as conn:
         await conn.execute("""
                            CREATE TABLE IF NOT EXISTS users
@@ -114,33 +107,9 @@ async def init_user_table() -> None:
                            );
                            """)
 
-        # Миграция только для legacy-схемы, где колонки ещё существуют
-        has_username = await conn.fetchval("""
-                                           SELECT EXISTS (
-                                               SELECT 1
-                                               FROM information_schema.columns
-                                               WHERE table_name = 'message_history'
-                                                 AND column_name = 'username'
-                                           );
-                                           """)
-
-        if has_username:
-            await conn.execute("""
-                               INSERT INTO users (user_id, username, first_name)
-                               SELECT DISTINCT ON (user_id)
-                                   user_id, username, first_name
-                               FROM message_history
-                               WHERE user_id IS NOT NULL
-                               ORDER BY user_id, (first_name IS NULL), (username IS NULL)
-                               ON CONFLICT (user_id) DO NOTHING;
-                               """)
-            await conn.execute("ALTER TABLE message_history DROP COLUMN IF EXISTS username;")
-            await conn.execute("ALTER TABLE message_history DROP COLUMN IF EXISTS first_name;")
-            logger.info("Users table populated from legacy message_history")
-
 
 async def init_chat_context_table() -> None:
-    """Создать таблицу для контекста LLM-диалога"""
+    """Create the LLM dialog context table."""
     async with pool.acquire() as conn:
         await conn.execute("""
                            CREATE TABLE IF NOT EXISTS chat_context
@@ -182,11 +151,7 @@ async def save_message(
         first_name: Optional[str],
         text: str
 ) -> None:
-    """Сохранить сообщение в БД (с защитой от дубликатов).
-
-    Данные пользователя пишутся в таблицу users (нормализованно),
-    в message_history хранится только user_id.
-    """
+    """Save a message, upserting its user into the users table."""
     async with pool.acquire() as conn:
         async with conn.transaction():
             if user_id:
@@ -208,7 +173,7 @@ async def get_last_messages(
         chat_id: int,
         limit: int = MESSAGE_HISTORY_LIMIT
 ) -> List[MessageRecord]:
-    """Получить последние N сообщений из чата"""
+    """Return the last N messages from a chat, in chronological order."""
     async with pool.acquire() as conn:
         rows = await conn.fetch("""
                                 SELECT m.message_id, m.user_id,
@@ -221,7 +186,6 @@ async def get_last_messages(
                                     LIMIT $2
                                 """, chat_id, limit)
 
-        # Возвращаем в хронологическом порядке
         return [
             MessageRecord(
                 message_id=row["message_id"],
@@ -239,7 +203,7 @@ async def cleanup_old_messages(
         chat_id: int,
         keep_last: int = MESSAGE_HISTORY_LIMIT
 ) -> int:
-    """Удалить старые сообщения, оставив только последние N"""
+    """Delete old messages, keeping only the last N."""
     async with pool.acquire() as conn:
         result = await conn.execute("""
                                     DELETE
@@ -260,7 +224,7 @@ async def cleanup_old_messages(
 
 
 async def cleanup_all_chats(keep_last: int = MESSAGE_HISTORY_LIMIT) -> dict:
-    """Очистить все чаты, оставив последние N сообщений в каждом"""
+    """Trim history in every chat, keeping the last N messages each."""
     async with pool.acquire() as conn:
         chat_ids = await conn.fetch("SELECT DISTINCT chat_id FROM message_history")
 
@@ -274,7 +238,7 @@ async def cleanup_all_chats(keep_last: int = MESSAGE_HISTORY_LIMIT) -> dict:
 
 
 async def save_context_message(chat_id: int, role: str, content: str) -> None:
-    """Сохранить сообщение в контекст LLM-диалога (role: user | assistant)"""
+    """Save a message to the LLM dialog context (role: user | assistant)."""
     async with pool.acquire() as conn:
         await conn.execute("""
                            INSERT INTO chat_context (chat_id, role, content)
@@ -283,7 +247,7 @@ async def save_context_message(chat_id: int, role: str, content: str) -> None:
 
 
 async def get_context_messages(chat_id: int) -> List[dict]:
-    """Получить сообщения контекста чата в хронологическом порядке"""
+    """Return the chat's context messages in chronological order."""
     async with pool.acquire() as conn:
         rows = await conn.fetch("""
                                 SELECT role, content
@@ -295,12 +259,9 @@ async def get_context_messages(chat_id: int) -> List[dict]:
 
 
 async def trim_context(chat_id: int, keep_users: int = 20) -> None:
-    """
-    Обрезать контекст, оставив последние keep_users сообщений пользователя
-    и все ответы бота после первого сохранённого.
-    """
+    """Keep the last keep_users user messages plus all following bot replies."""
     async with pool.acquire() as conn:
-        # Ищем id первого сообщения, с которого начинаются последние keep_users user-сообщений
+        # Find the first message of the last keep_users user messages
         row = await conn.fetchrow("""
                                   SELECT id
                                   FROM chat_context
@@ -308,7 +269,6 @@ async def trim_context(chat_id: int, keep_users: int = 20) -> None:
                                   ORDER BY ts DESC, id DESC
                                   LIMIT 1 OFFSET $2
                                   """, chat_id, max(keep_users - 1, 0))
-        # Если user-сообщений меньше или равно keep_users — ничего не чистим
         if row is None:
             return
 
@@ -320,15 +280,13 @@ async def trim_context(chat_id: int, keep_users: int = 20) -> None:
 
 
 async def clear_context(chat_id: int) -> None:
-    """Полностью очистить контекст чата"""
+    """Clear the chat's LLM context."""
     async with pool.acquire() as conn:
         await conn.execute("DELETE FROM chat_context WHERE chat_id = $1", chat_id)
 
 
 async def close_db() -> None:
-    """
-    Закрыть пул соединений при остановке бота
-    """
+    """Close the connection pool on bot shutdown."""
     global pool
     if pool:
         await pool.close()

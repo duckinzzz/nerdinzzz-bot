@@ -44,7 +44,6 @@ def _sync_search(query: str, max_results: int) -> list[dict]:
         return list(ddgs.text(query, max_results=max_results))
 
 
-# ── Tool definition ────────────────────────────────────────────────────
 search_tool = Tool(
     name="web_search",
     description=(
