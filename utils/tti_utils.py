@@ -1,4 +1,5 @@
 import base64
+import json
 
 import aiohttp
 from aiogram.types import BufferedInputFile
@@ -27,8 +28,15 @@ async def generate_image(prompt: str) -> BufferedInputFile | None:
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(url, headers=headers, json=payload) as response:
-                response.raise_for_status()
-                data = await response.json()
+                body = await response.text()
+                if not response.ok:
+                    log_error(
+                        request_type='image_generation',
+                        user_prompt=prompt,
+                        error=f"HTTP {response.status}: {body[:1000]}",
+                    )
+                    return None
+                data = json.loads(body)
 
         img_b64 = data["result"]["image"]
         img_bytes = base64.b64decode(img_b64)

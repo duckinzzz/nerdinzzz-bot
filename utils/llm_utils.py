@@ -147,6 +147,7 @@ async def get_llm_response(
         "model": LLM_MODEL,
         "messages": messages,
         "temperature": 0.7,
+        "reasoning_effort": "low",
         "max_completion_tokens": 4096,
         "top_p": 1,
         "stream": False,
@@ -212,8 +213,8 @@ async def get_llm_response(
         return "❌ Ошибка при обработке запроса"
 
 
-async def make_prompt(user_prompt: str) -> str:
-    system_prompt = """
+async def make_prompt(user_prompt: str, system_instruction: str | None = None) -> str:
+    system_prompt = system_instruction or """
         Rewrite user input into image generation prompt.
         No violence. More realistic style if not specified.
         Just transform user input to text-to-image prompt.
@@ -233,6 +234,7 @@ async def make_prompt(user_prompt: str) -> str:
         "model": LLM_MODEL,
         "messages": messages,
         "temperature": 1,
+        "reasoning_effort": "low",
         "max_completion_tokens": 4096,
         "top_p": 1,
         "stream": False,
@@ -342,6 +344,7 @@ async def generate_summary(messages_json: list[dict], chat_id: int, total_count:
         "model": LLM_MODEL,
         "messages": messages,
         "temperature": 0.7,
+        "reasoning_effort": "low",
         "max_completion_tokens": 8192,
         "top_p": 1,
         "stream": False,
