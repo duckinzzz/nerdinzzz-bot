@@ -4,24 +4,22 @@ import re
 import tempfile
 
 from aiogram import types
-from groq import AsyncGroq, APIStatusError as GroqAPIStatusError
 from openai import AsyncOpenAI, APIStatusError
 
 from core.app import bot
-from core.config import LLM_TOKEN, STT_TOKEN
+from core.config import LLM_TOKEN
 from core.constants import LLM_MODEL
 from utils.logging_utils import log_error, log_event
 from utils.tools import get_tool_registry
 
-# DeepSeek — text generation
+# DeepSeek — text generation & vision/OCR
 client = AsyncOpenAI(
     api_key=LLM_TOKEN,
     base_url="https://api.deepseek.com",
 )
 
-# Groq — vision/OCR (DeepSeek V4 Flash doesn't support images)
-groq_client = AsyncGroq(api_key=STT_TOKEN)
-OCR_MODEL = "qwen/qwen3.6-27b"
+# DeepSeek vision model (only it accepts images; others return 400)
+OCR_MODEL = "deepseek-v4-flash-vision-exp"
 
 
 def encode_image(image_path: str) -> str:
@@ -45,7 +43,7 @@ async def get_ocr_response(caption: str, photos: list[types.PhotoSize]) -> str:
     caption: text description / caption
     photos: list of Telegram PhotoSize objects
 
-    Uses Groq (qwen3.6-27b) for vision
+    Uses DeepSeek (deepseek-v4-flash-vision-exp) for vision
     """
     system_prompt = """
     Ты — Nerdinzzz 🤓, ассистент по анализу изображений. Твой создатель — @duckinzzz.
@@ -86,10 +84,10 @@ async def get_ocr_response(caption: str, photos: list[types.PhotoSize]) -> str:
     }
 
     try:
-        completion = await groq_client.chat.completions.create(**kwargs)
+        completion = await client.chat.completions.create(**kwargs)
         raw = completion.choices[0].message.content or ""
 
-        # Strip Qwen reasoning tags — Telegram can't parse them as Markdown
+        # Strip reasoning tags — Telegram can't parse them as Markdown
         content = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
 
         if not content:
@@ -98,7 +96,7 @@ async def get_ocr_response(caption: str, photos: list[types.PhotoSize]) -> str:
 
         return content
 
-    except GroqAPIStatusError as e:
+    except APIStatusError as e:
         if e.status_code == 413:
             log_error(request_type='process_image', caption=caption, error=e)
             return "❌ Сообщение слишком длинное, попробуйте укоротить сообщение"
