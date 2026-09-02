@@ -13,7 +13,7 @@ async def generate_image(prompt: str) -> BufferedInputFile | None:
     Generate image from text prompt using Cloudflare AI.
     Returns BufferedInputFile for sending via Telegram or None on error.
     """
-    model = '@cf/black-forest-labs/flux-2-dev'
+    model = '@cf/black-forest-labs/flux-2-klein-4b'
     url = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/run/{model}"
 
     # flux-2-dev requires multipart/form-data, even for a prompt-only request
