@@ -1,3 +1,5 @@
+import re
+
 from aiogram import F, Router
 from aiogram.types import Message, BufferedInputFile
 from groq import RateLimitError
@@ -37,22 +39,17 @@ async def process_text_request(message: Message, text: str) -> None:
 
     # TEXT TO IMAGE
     if text.lower().startswith("нарисуй"):
-        prompt = text.lower().replace("нарисуй", '').strip()
+        # Send the user's words straight to the image model, no LLM rewriting
+        prompt = re.sub(r"^нарисуй\s*", "", text, flags=re.IGNORECASE).strip()
         if not prompt:
             await send_response("❌ Укажите, что нарисовать")
             return
 
         ans = await send_response('🖌️ Рисую...')
-        llm_prompt = await llm_utils.make_prompt(prompt)
-        if not llm_prompt:
-            await ans.delete()
-            await send_response("❌ Не получилось обработать промпт")
-            return
-
-        image = await tti_utils.generate_image(llm_prompt)
+        image = await tti_utils.generate_image(prompt)
         await ans.delete()
         if image:
-            log_message(request_type='image_generation', message=message, llm_prompt=llm_prompt)
+            log_message(request_type='image_generation', message=message, llm_prompt=prompt)
             await send_response(photo=image)
         else:
             await send_response("❌ Не получилось сгенерировать изображение")
