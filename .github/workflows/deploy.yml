@@ -64,6 +64,7 @@ jobs:
             ENV=${{ secrets.ENV }}
             BOT_TOKEN=${{ secrets.BOT_TOKEN }}
             BOT_USERNAME=${{ secrets.BOT_USERNAME }}
+            ADMIN_ID=${{ secrets.ADMIN_ID }}
             LLM_TOKEN=${{ secrets.LLM_TOKEN }}
             STT_TOKEN=${{ secrets.STT_TOKEN }}
             TTS_TOKEN=${{ secrets.TTS_TOKEN }}

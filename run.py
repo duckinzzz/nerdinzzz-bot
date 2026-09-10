@@ -4,12 +4,24 @@ from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_applicati
 from aiohttp import web
 from aiohttp.web_app import Application
 from core.app import bot, dp
-from core.config import WEBHOOK_HOST, WEBHOOK_PORT, WEBHOOK_PATH, ENV, WEBHOOK_URL
+from core.config import WEBHOOK_HOST, WEBHOOK_PORT, WEBHOOK_PATH, ENV, WEBHOOK_URL, ADMIN_ID
 from handlers import get_main_router
 from utils import db_utils
 from utils.logging_utils import logger
 from utils.scheduler import run_daily_cleanup
 from utils.tools import init_tools
+
+
+async def notify_admin_ready() -> None:
+    if not ADMIN_ID:
+        logger.warning("ADMIN_ID is not set, skipping startup notification")
+        return
+
+    try:
+        await bot.send_message(ADMIN_ID, f"ready [{ENV}]")
+        logger.info(f"[{ENV}] Startup notification sent to admin {ADMIN_ID}")
+    except Exception as e:
+        logger.error(f"[{ENV}] Failed to send startup notification: {e}")
 
 
 async def on_startup(_: Application) -> None:
@@ -19,6 +31,7 @@ async def on_startup(_: Application) -> None:
     asyncio.create_task(run_daily_cleanup(bot))
     await bot.set_webhook(url=WEBHOOK_URL, drop_pending_updates=True, allowed_updates=[])
     logger.info(f"[{ENV}] Webhook set to {WEBHOOK_URL}")
+    await notify_admin_ready()
 
 
 async def on_shutdown(_: Application) -> None:
@@ -48,6 +61,7 @@ async def main_polling():
     dp.include_router(get_main_router())
     asyncio.create_task(run_daily_cleanup(bot))
     await bot.delete_webhook(drop_pending_updates=True)
+    await notify_admin_ready()
     try:
         await dp.start_polling(bot, skip_updates=True)
     finally:
