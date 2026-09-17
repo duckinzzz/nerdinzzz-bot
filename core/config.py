@@ -2,7 +2,7 @@ import os
 
 from utils.logging_utils import logger
 
-ENV = os.getenv("ENV").lower()
+ENV = os.getenv("ENV", "dev").lower()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 LLM_TOKEN = os.getenv("LLM_TOKEN")
 STT_TOKEN = os.getenv("STT_TOKEN")
