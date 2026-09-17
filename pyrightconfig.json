@@ -1,0 +1,7 @@
+{
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonVersion": "3.13",
+  "include": ["core", "handlers", "utils", "run.py"],
+  "exclude": [".venv", ".idea"]
+}
