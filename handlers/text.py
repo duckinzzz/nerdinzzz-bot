@@ -1,16 +1,17 @@
 import re
 
 from aiogram import F, Router
-from aiogram.types import Message, BufferedInputFile
+from aiogram.types import Message, BufferedInputFile, MessageEntity
 from groq import RateLimitError
 from telegramify_markdown import convert
 
 from core.config import BOT_USERNAME
 from core.app import bot
-from core.constants import CONTEXT_LIMIT
+from core.constants import CONTEXT_LIMIT, REPLY_CHUNK_LIMIT
 from utils import llm_utils, tti_utils, tts_utils
 from utils.db_utils import get_context_messages, save_context_message, trim_context
 from utils.logging_utils import log_message, log_error
+from utils.text_utils import split_message_with_entities
 
 text_router = Router()
 
@@ -20,7 +21,12 @@ async def process_text_request(message: Message, text: str) -> None:
     chat_id = message.chat.id
     is_group = message.chat.type in ("group", "supergroup")
 
-    async def send_response(response_text: str = None, photo=None, voice=None, entities=None):
+    async def send_response(
+            response_text: str | None = None,
+            photo=None,
+            voice=None,
+            entities=None,
+    ) -> Message | None:
         if photo:
             if is_group:
                 return await message.reply_photo(photo=photo)
@@ -32,10 +38,25 @@ async def process_text_request(message: Message, text: str) -> None:
             else:
                 return await message.answer_voice(voice=voice)
         else:
-            if is_group:
-                return await message.reply(response_text, entities=entities)
-            else:
-                return await message.answer(response_text, entities=entities)
+            # Telegram rejects messages over 4096 chars, so long replies go out in chunks
+            chunks = split_message_with_entities(response_text or "", entities or [], REPLY_CHUNK_LIMIT)
+            first = None
+            for chunk_text, chunk_entities in chunks:
+                if not chunk_text:
+                    continue
+                built = [MessageEntity(**e) for e in chunk_entities] or None
+                if is_group:
+                    sent = await message.reply(chunk_text, entities=built)
+                else:
+                    sent = await message.answer(chunk_text, entities=built)
+                if first is None:
+                    first = sent
+            return first
+
+    async def drop(sent: Message | None) -> None:
+        """Delete a service message ("Рисую..."), if it went out."""
+        if sent is not None:
+            await sent.delete()
 
     # TEXT TO IMAGE
     if text.lower().startswith("нарисуй"):
@@ -47,7 +68,7 @@ async def process_text_request(message: Message, text: str) -> None:
 
         ans = await send_response('🖌️ Рисую...')
         image = await tti_utils.generate_image(prompt)
-        await ans.delete()
+        await drop(ans)
         if image:
             log_message(request_type='image_generation', message=message, llm_prompt=prompt)
             await send_response(photo=image)
@@ -71,30 +92,32 @@ async def process_text_request(message: Message, text: str) -> None:
         ans = await send_response('🗣 Ща выдам...')
         try:
             voice = await tts_utils.generate_voice(prompt)
-            await ans.delete()
+            await drop(ans)
             await send_response(voice=BufferedInputFile(voice, 'voice'))
         except RateLimitError as e:
-            await ans.delete()
+            await drop(ans)
             wait_time = getattr(e, "wait_time", None)
             if wait_time:
                 await send_response(f"⏳ Подождите {wait_time}, или попробуйте менее длинное сообщение")
             else:
                 await send_response("⏳ Слишком много запросов")
         except Exception as e:
-            await ans.delete()
+            await drop(ans)
             log_error(request_type='text_to_speech', message=message, error=e)
             await send_response("❌ Не смог выговорить")
         return
 
     # Regular LLM request
     history = await get_context_messages(chat_id)
-    llm_response = await llm_utils.get_llm_response(text, chat_id=chat_id, history=history)
-    text, entities = convert(llm_response)
+    # Keep the user's own words — `formatted` below is the bot's answer
+    user_text = text
+    llm_response = await llm_utils.get_llm_response(user_text, chat_id=chat_id, history=history)
+    formatted, entities = convert(llm_response)
     log_message(request_type='llm_question', message=message, llm_response=llm_response)
-    await send_response(text, entities=[e.to_dict() for e in entities])
+    await send_response(formatted, entities=entities)
 
     # Save the dialog to context, then trim to the limit
-    await save_context_message(chat_id, "user", text)
+    await save_context_message(chat_id, "user", user_text)
     await save_context_message(chat_id, "assistant", llm_response)
     await trim_context(chat_id, keep_users=CONTEXT_LIMIT)
 

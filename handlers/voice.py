@@ -5,8 +5,10 @@ from aiogram import F, Router
 from aiogram.types import Message, reaction_type_emoji
 
 from core.app import bot
+from core.constants import REPLY_CHUNK_LIMIT
 from utils import stt_utils
 from utils.logging_utils import log_message
+from utils.text_utils import split_long_text
 
 voice_router = Router()
 
@@ -14,11 +16,15 @@ voice_router = Router()
 async def reply_transcript(message: Message, stt_response: str | None) -> None:
     if stt_response:
         log_message(request_type='stt_request', message=message, stt_response=stt_response)
+        # Escape first: HTML entities make the text longer, so the chunks
+        # must be measured after escaping to stay under Telegram's limit.
+        escaped = html.escape(stt_response)
         # <blockquote expandable> — сворачиваемая цитата (Bot API 7.3+)
-        await message.reply(
-            f"<blockquote expandable>{html.escape(stt_response)}</blockquote>",
-            parse_mode="HTML",
-        )
+        for chunk in split_long_text(escaped, REPLY_CHUNK_LIMIT):
+            await message.reply(
+                f"<blockquote expandable>{chunk}</blockquote>",
+                parse_mode="HTML",
+            )
     else:
         log_message(request_type='stt_request', message=message, stt_response='')
         await message.react([reaction_type_emoji.ReactionTypeEmoji(emoji="🙉")])

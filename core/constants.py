@@ -1,10 +1,19 @@
 LLM_MODEL = "deepseek-v4-flash"
 
+# Timezone the LLM is told the current date in (IANA name).
+# Vladivostok, because that is where the bot's chats are.
+TIMEZONE = "Asia/Vladivostok"
+
 # Number of messages to store and analyze
 MESSAGE_HISTORY_LIMIT = 100
 
 # Max user messages kept in the LLM dialog context
 CONTEXT_LIMIT = 20
+
+# Telegram rejects text messages longer than this (Bot API limit)
+TELEGRAM_TEXT_LIMIT = 4096
+# Chunk size for long replies — leaves room for the <blockquote> wrapper and HTML escaping
+REPLY_CHUNK_LIMIT = 3900
 
 # Prompt for summary generation
 SUMMARY_PROMPT = """
