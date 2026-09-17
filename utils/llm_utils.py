@@ -2,13 +2,15 @@ import base64
 import html
 import re
 import tempfile
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from aiogram import types
 from openai import AsyncOpenAI, APIStatusError
 
 from core.app import bot
 from core.config import LLM_TOKEN
-from core.constants import LLM_MODEL
+from core.constants import LLM_MODEL, TIMEZONE
 from utils.logging_utils import log_error, log_event
 from utils.tools import get_tool_registry
 
@@ -20,6 +22,27 @@ client = AsyncOpenAI(
 
 # DeepSeek vision model (only it accepts images; others return 400)
 OCR_MODEL = "deepseek-v4-flash-vision-exp"
+
+# How many times the model may call tools before it is forced to answer.
+# Each round is a full LLM call (~3s), so this trades latency for accuracy;
+# tool_rounds_exhausted in the logs tells whether it is set right.
+MAX_TOOL_ROUNDS = 3
+# Tool output is truncated before it goes to the logs
+TOOL_LOG_LIMIT = 500
+
+_WEEKDAYS_RU = (
+    "понедельник", "вторник", "среда", "четверг",
+    "пятница", "суббота", "воскресенье",
+)
+
+
+def current_datetime_line() -> str:
+    """Human-readable current date — the model cannot know it otherwise."""
+    now = datetime.now(ZoneInfo(TIMEZONE))
+    return (
+        f"Сейчас {now.strftime('%d.%m.%Y')}, "
+        f"{_WEEKDAYS_RU[now.weekday()]}, {now.strftime('%H:%M')} ({TIMEZONE})."
+    )
 
 
 def encode_image(image_path: str) -> str:
@@ -129,10 +152,11 @@ async def get_llm_response(
     - Всегда придерживайся нейтрального и дружелюбного тона.
     - Не экранируй символы, кавычки или специальные знаки — выводи текст «как есть».
     - Если нужны актуальные данные (погода, курсы валют и т.д.) — используй доступные инструменты.
+    - Если поиск не дал результатов — скажи об этом прямо, не выдумывай факты.
     """
 
     messages: list[dict] = [
-        {"role": "system", "content": system_prompt.lower()},
+        {"role": "system", "content": f"{system_prompt}\n{current_datetime_line()}"},
     ]
     if history:
         messages.extend(history)
@@ -157,10 +181,11 @@ async def get_llm_response(
     try:
         # First LLM call — may return tool_calls
         completion = await client.chat.completions.create(**kwargs)
-        msg = completion.choices[0].message
+        choice = completion.choices[0]
+        msg = choice.message
 
-        # Function calling loop (max 2 rounds: 1 tool round + 1 final response)
-        for _ in range(2):
+        # Function calling loop — each round executes the requested tools
+        for _ in range(MAX_TOOL_ROUNDS):
             if not msg.tool_calls:
                 break
 
@@ -172,6 +197,7 @@ async def get_llm_response(
             log_event(
                 event="tool_calls",
                 tools=[tc.function.name for tc in msg.tool_calls],
+                results=[r["content"][:TOOL_LOG_LIMIT] for r in tool_results],
             )
 
             messages.append({
@@ -190,12 +216,35 @@ async def get_llm_response(
             # Follow-up LLM call — with tool results
             kwargs["messages"] = messages
             completion = await client.chat.completions.create(**kwargs)
-            msg = completion.choices[0].message
+            choice = completion.choices[0]
+            msg = choice.message
+
+        # The rounds are used up but the model still wants to call a tool.
+        # Its content is empty by design on a tool-call message, so ask once
+        # more with tools disabled to get an actual answer instead of nothing.
+        if msg.tool_calls:
+            log_event(
+                event="tool_rounds_exhausted",
+                tools=[tc.function.name for tc in msg.tool_calls],
+                max_rounds=MAX_TOOL_ROUNDS,
+            )
+            kwargs["messages"] = messages
+            if tools:
+                kwargs["tool_choice"] = "none"
+            completion = await client.chat.completions.create(**kwargs)
+            choice = completion.choices[0]
+            msg = choice.message
 
         content = (msg.content or "").strip()
 
         if not content:
-            log_error(request_type='llm_question', user_prompt=user_prompt, error='empty_response')
+            log_error(
+                request_type='llm_question',
+                user_prompt=user_prompt,
+                error='empty_response',
+                finish_reason=choice.finish_reason,
+                tool_calls=[tc.function.name for tc in (msg.tool_calls or [])],
+            )
             return "❌ Модель не смогла ответить на ваш вопрос. Попробуйте переформулировать вопрос."
 
         return content
