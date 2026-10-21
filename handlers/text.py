@@ -16,6 +16,18 @@ from utils.text_utils import split_message_with_entities
 text_router = Router()
 
 
+def _is_reply_to_bot(message: Message) -> bool:
+    """True if the message replies to a message sent by this bot.
+
+    In groups a reply to the bot's message is treated as addressing the bot,
+    so an explicit @username mention is not required.
+    """
+    reply = message.reply_to_message
+    if reply is None or reply.from_user is None or message.bot is None:
+        return False
+    return reply.from_user.id == message.bot.id
+
+
 async def process_text_request(message: Message, text: str) -> None:
     """Handle a text request: image/voice generation or LLM reply."""
     chat_id = message.chat.id
@@ -126,10 +138,10 @@ async def process_text_request(message: Message, text: str) -> None:
 @text_router.message(
     F.content_type == "text",
     F.chat.type.in_(["group", "supergroup"]),
-    lambda m: m.text and m.text.startswith(f"@{BOT_USERNAME}")
+    lambda m: (m.text and m.text.startswith(f"@{BOT_USERNAME}")) or _is_reply_to_bot(m)
 )
 async def text_group_handler(message: Message):
-    text = message.text.replace(f'@{BOT_USERNAME}', '').strip()
+    text = (message.text or "").replace(f'@{BOT_USERNAME}', '').strip()
     if not text:
         return
     await process_text_request(message, text)
@@ -137,4 +149,4 @@ async def text_group_handler(message: Message):
 
 @text_router.message(F.content_type == "text", F.chat.type == "private")
 async def text_private_handler(message: Message):
-    await process_text_request(message, message.text)
+    await process_text_request(message, message.text or "")
