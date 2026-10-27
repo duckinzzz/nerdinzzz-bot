@@ -123,7 +123,12 @@ async def visualize_summary_handler(callback: CallbackQuery, bot: Bot):
             await callback.message.answer("❌ Не получилось обработать промпт")
             return
 
-        image = await tti_utils.generate_image(llm_prompt)
+        try:
+            image = await tti_utils.generate_image(llm_prompt)
+        except tti_utils.ImageFlagged:
+            await status_msg.delete()
+            await callback.message.answer("🚫 Изображение не прошло цензуру")
+            return
         await status_msg.delete()
         if image:
             log_message(request_type='image_generation', message=callback.message, llm_prompt=llm_prompt)

@@ -79,7 +79,12 @@ async def process_text_request(message: Message, text: str) -> None:
             return
 
         ans = await send_response('🖌️ Рисую...')
-        image = await tti_utils.generate_image(prompt)
+        try:
+            image = await tti_utils.generate_image(prompt)
+        except tti_utils.ImageFlagged:
+            await drop(ans)
+            await send_response("🚫 Изображение не прошло цензуру")
+            return
         await drop(ans)
         if image:
             log_message(request_type='image_generation', message=message, llm_prompt=prompt)
