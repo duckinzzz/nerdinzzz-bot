@@ -1,19 +1,22 @@
-"""Web search tool — DuckDuckGo (free, no API key)."""
+"""Web search tool — DeepSeek Search API."""
 
 from __future__ import annotations
 
-import asyncio
-import re
+import aiohttp
 
-from ddgs import DDGS
-
+from core.config import LLM_TOKEN
 from utils.logging_utils import logger
 
 from .base import Tool
 
+_SEARCH_URL = "https://api.deepseek.com/v1/tools/search"
 _MAX_RESULTS = 5
-# Shorter query words carry too little signal to judge relevance by
-_MIN_TOKEN_LENGTH = 4
+# The API rejects queries longer than this
+_QUERY_LIMIT = 128
+# `summary` comes back as whole page text, not the short blurb the docs promise.
+# Trim it so five results cannot flood the model's context.
+_SUMMARY_LIMIT = 300
+_TIMEOUT = aiohttp.ClientTimeout(total=20)
 
 # Phrased so the model stops retrying instead of re-running the search forever
 _NO_RESULTS = (
@@ -22,65 +25,49 @@ _NO_RESULTS = (
 )
 
 
+def _squash(text: str) -> str:
+    """Collapse page markup/newlines into one short line for the model."""
+    text = " ".join(text.split())
+    if len(text) > _SUMMARY_LIMIT:
+        text = text[:_SUMMARY_LIMIT].rstrip() + "…"
+    return text
+
+
 async def web_search(query: str) -> str:
-    """Search the web and return formatted results."""
+    """Search the web through the DeepSeek Search API and format the results."""
+    query = query.strip()[:_QUERY_LIMIT]
+    if not query:
+        return _NO_RESULTS.format(query=query)
+
+    payload = {"query": query, "count": _MAX_RESULTS}
+    headers = {"Authorization": f"Bearer {LLM_TOKEN}"}
+
     try:
-        # DDGS is synchronous — run in thread to avoid blocking the event loop
-        results = await asyncio.to_thread(
-            _sync_search, query, _MAX_RESULTS
-        )
-
-        if not results:
-            return _NO_RESULTS.format(query=query)
-
-        relevant = [r for r in results if _is_relevant(query, r)]
-        if not relevant:
-            # ddgs falls back to other engines when DuckDuckGo throttles, and
-            # those sometimes answer with unrelated pages. Handing that to the
-            # model makes it retry the search instead of answering.
-            logger.warning("Web search returned only irrelevant results for '%s'", query)
-            return _NO_RESULTS.format(query=query)
-
-        lines = [f"🔍 Результаты поиска: **{query}**\n"]
-        for i, r in enumerate(relevant, 1):
-            title = r.get("title", "Без названия")
-            href = r.get("href", "")
-            body = r.get("body", "")[:200]
-            lines.append(f"{i}. **{title}**\n   {body}\n   {href}\n")
-
-        return "\n".join(lines)
-
+        async with aiohttp.ClientSession(timeout=_TIMEOUT) as session:
+            async with session.post(_SEARCH_URL, json=payload, headers=headers) as resp:
+                if resp.status != 200:
+                    body = (await resp.text())[:300]
+                    logger.warning(
+                        "Web search failed for '%s': HTTP %s %s", query, resp.status, body
+                    )
+                    return f"❌ Не удалось выполнить поиск: HTTP {resp.status}"
+                data: dict = await resp.json()
     except Exception as e:
         logger.warning("Web search failed for '%s': %s", query, e)
         return f"❌ Не удалось выполнить поиск: {e}"
 
+    results = data.get("results") or []
+    if not results:
+        return _NO_RESULTS.format(query=query)
 
-def _query_tokens(query: str) -> list[str]:
-    """Meaningful words of a query — used to judge result relevance."""
-    return [
-        word for word in re.findall(r"\w+", query.lower())
-        if len(word) >= _MIN_TOKEN_LENGTH
-    ]
+    lines = [f"🔍 Результаты поиска: **{query}**\n"]
+    for i, r in enumerate(results[:_MAX_RESULTS], 1):
+        title = r.get("title") or "Без названия"
+        text = _squash(r.get("summary") or r.get("snippet") or "")
+        url = r.get("url") or ""
+        lines.append(f"{i}. **{title}**\n   {text}\n   {url}\n")
 
-
-def _is_relevant(query: str, result: dict) -> bool:
-    """Whether a result shares at least one meaningful word with the query.
-
-    Deliberately lenient: the goal is to drop pages that are obviously about
-    something else, not to rank what is left.
-    """
-    tokens = _query_tokens(query)
-    if not tokens:
-        return True
-
-    haystack = f"{result.get('title', '')} {result.get('body', '')}".lower()
-    return any(token in haystack for token in tokens)
-
-
-def _sync_search(query: str, max_results: int) -> list[dict]:
-    """Synchronous DuckDuckGo search — runs in a thread."""
-    with DDGS() as ddgs:
-        return list(ddgs.text(query, max_results=max_results))
+    return "\n".join(lines)
 
 
 search_tool = Tool(
